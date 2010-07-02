@@ -1,0 +1,46 @@
+/*
+ * Closed Process Group (Corosync CPG) failover module for Freeswitch
+ *
+ * Copyright (C) 2010 Voismart SRL
+ *
+ * Authors: Stefano Bossi <sbossi@voismart.it>
+ *
+ * Further Contributors:
+ * Matteo Brancaleoni <mbrancaleoni@voismart.it> - Original idea
+ *
+ * This program cannot be modified, distributed or used without
+ * specific written permission of the copyright holder.
+ *
+ * The source code is provided only for evaluation purposes.
+ * Any usage or license must be negotiated directly with Voismart Srl.
+ *
+ * Voismart Srl
+ * Via Benigno Crespi 12
+ * 20159 Milano - MI
+ * ITALY 
+ *
+ * Phone : +39.02.70633354
+ *
+ */
+#ifndef MOD_CPG_H
+#define MOD_CPG_H
+
+#include <switch.h>
+#include <corosync/cpg.h>
+#include <corosync/swab.h>
+#include <string.h>
+
+struct {
+	switch_memory_pool_t *pool;
+	switch_hash_t *profile_hash;
+	int running;
+	cpg_handle_t handle;
+	struct cpg_name group_name;
+	switch_event_node_t *node;
+} globals;
+
+
+/*main functions*/
+void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj);
+void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
+#endif
