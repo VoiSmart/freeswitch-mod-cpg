@@ -204,7 +204,7 @@ void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj)
 	                        "Rollback thread for %s started, waiting for %s!\n",
 	                                  profile->name, node_pid_format(local_id));
 	
-	for (int i;i < profile->rollback_delay * 60; i++) {
+	for (int i = 0;i < profile->rollback_delay * 60; i++) {
 	    switch_yield(1000000);
 	    if ( profile->rollback_node_id != local_id) {
 	         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,

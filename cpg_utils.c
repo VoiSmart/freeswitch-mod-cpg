@@ -224,11 +224,12 @@ char *utils_state_to_string(profile_state_t pstate)
 
 profile_state_t utils_string_to_state(char *state)
 {
-    profile_state_t pstate;
+    profile_state_t pstate = STANDBY;
     if (!strcasecmp(state,"MASTER")) pstate = MASTER;
     else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
     else if (!strcasecmp(state,"INIT")) pstate = INIT;
-    
+    else if (!strcasecmp(state,"STANDBY")) pstate = STANDBY;
+
     return pstate;
 }
 
