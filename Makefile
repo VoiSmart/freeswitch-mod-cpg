@@ -2,6 +2,7 @@ INSTALL_PREFIX?=
 
 INSTDIR = $(INSTALL_PREFIX)/opt/freeswitch
 MODDIR = $(INSTDIR)/mod
+CONFDIR = $(INSTDIR)/conf/autoload_configs
 CC=gcc
 INCLUDE= -lcpg -I$(INSTDIR)/include
 CFLAGS= -fPIC -Werror -fvisibility=hidden -DSWITCH_API_VISIBILITY=1 -DHAVE_VISIBILITY=1 -g -ggdb -g -O2 -Wall -std=c99 -pedantic -Wdeclaration-after-statement -D_GNU_SOURCE -DHAVE_CONFIG_H
@@ -24,9 +25,17 @@ clean:
 	rm -f *.so; \
 	rm -rf .libs;
 
-install: all 
+install: all conf-install 
 	mkdir -p $(MODDIR); \
 	install *.so $(MODDIR);
+
+conf-install:
+	mkdir -p $(CONFDIR); \
+        if [ ! -f $(CONFDIR)/cpg.conf.xml ]; \
+	then \
+		echo "installing conf file"; \
+		install cpg.conf.xml $(CONFDIR); \
+	fi
 
 uninstall:
 	rm -f $(MODDIR)/mod_cpg.so
