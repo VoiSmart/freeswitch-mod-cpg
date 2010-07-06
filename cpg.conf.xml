@@ -1,0 +1,20 @@
+<configuration name="cpg.conf" description="advanced failover">
+  <global_settings>
+    <profile name="internal">
+        <!-- virtual ip to be set-->
+        <param name="virtual-ip" value="192.168.1.51"/>
+        <!-- device where to set virtual ip-->
+        <param name="device" value="eth0"/>
+        <!-- enable profile autoload -->
+        <param name="autoload" value="true"/>
+        <!-- enable profile autorollback -->
+        <param name="autorollback" value="true"/>
+        <!-- enable profile calls recover -->
+        <param name="autorecover" value="true"/>
+	    <!-- minutes to wait before rollbacking  -->   
+        <param name="rollback-delay" value="1"/>
+        <!-- priority value  -->   
+        <param name="priority" value="100"/>
+    </profile>
+  </global_settings>
+</configuration>
