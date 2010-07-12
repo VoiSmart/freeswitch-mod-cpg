@@ -1,5 +1,6 @@
 INSTALL_PREFIX?=
 
+CORODIR = /etc/corosync
 INSTDIR = $(INSTALL_PREFIX)/opt/freeswitch
 MODDIR = $(INSTDIR)/mod
 CONFDIR = $(INSTDIR)/conf/autoload_configs
@@ -31,11 +32,20 @@ install: all conf-install
 
 conf-install:
 	mkdir -p $(CONFDIR); \
-        if [ ! -f $(CONFDIR)/cpg.conf.xml ]; \
+	if [ ! -f $(CONFDIR)/cpg.conf.xml ]; \
 	then \
 		echo "installing conf file"; \
 		install cpg.conf.xml $(CONFDIR); \
 	fi
+	#echo "installing corosync conf file"; \
+	
+	install corosync.conf $(CORODIR); 
+	if [ ! -f $(CORODIR)/uidgid.d/freeswitch.corosync ]; \
+	then \
+		echo "installing corosync uidgig conf file"; \
+		install freeswitch.corosync $(CORODIR)/uidgid.d; \
+	fi
+
 
 uninstall:
 	rm -f $(MODDIR)/mod_cpg.so

@@ -1,0 +1,4 @@
+uidgid {
+	uid: freeswitch
+	gid: daemon
+}
