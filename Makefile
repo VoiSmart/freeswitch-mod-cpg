@@ -4,7 +4,7 @@ INSTDIR = $(INSTALL_PREFIX)/opt/freeswitch
 MODDIR = $(INSTDIR)/mod
 CONFDIR = $(INSTDIR)/conf/autoload_configs
 CC=gcc
-INCLUDE= -lcpg -I$(INSTDIR)/include
+INCLUDE= -lcpg -lnl -I$(INSTDIR)/include
 CFLAGS= -fPIC -Werror -fvisibility=hidden -DSWITCH_API_VISIBILITY=1 -DHAVE_VISIBILITY=1 -g -ggdb -g -O2 -Wall -std=c99 -pedantic -Wdeclaration-after-statement -D_GNU_SOURCE -DHAVE_CONFIG_H
 LDFLAGS=
 SOURCES= arpator.c cpg_utils.c profile.c mod_cpg.c

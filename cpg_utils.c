@@ -24,19 +24,118 @@
  */
 
 #include "cpg_utils.h"
-
-#include <sys/ioctl.h>
 #include <net/if.h>
+#include <arpa/inet.h>
+
+#include <netlink/route/addr.h>
+#include <netlink/route/link.h>
+
 #include "profile.h"
 
+typedef enum {
+    ADD_IP,
+    DEL_IP
+} cmd_t;
+
+/* libnl bug */
+extern inline void *nl_object_priv(struct nl_object *obj) {return obj;}
+
+/*helpers*/
+int init_handle(struct nl_handle **handle);
+int ip_addr(char *ip4addr, char *interface, cmd_t cmd);
+
+int init_handle(struct nl_handle **handle) 
+{
+    
+    *handle = nl_handle_alloc();
+    if (!*handle)
+        return -1;
+
+    if (nl_connect(*handle, NETLINK_ROUTE)) {
+        nl_handle_destroy(*handle);
+        return -1;
+    }
+    return 0;
+}
+
+int ip_addr(char *ip4addr, char *interface, cmd_t cmd) 
+{
+    struct nl_handle *nlh = NULL;
+    struct rtnl_addr *addr = NULL;
+    struct nl_addr *nl_addr = NULL;
+    uint32_t binaddr = 0;
+    int iface_idx = -1;
+    int err,ret = 0;
+
+    if (init_handle(&nlh) != 0) {
+        return -1;
+    }
+
+    iface_idx = if_nametoindex(interface);
+    if (iface_idx < 0) {
+        return -1;
+    }
+        
+
+    addr = rtnl_addr_alloc ();
+    if (!addr) {
+        return -1;
+    }
+
+    inet_pton(AF_INET, ip4addr, &binaddr);
+
+    nl_addr = nl_addr_build (AF_INET, &binaddr, sizeof(binaddr));
+    if (!nl_addr) {
+        ret = -1;
+        goto out;
+    }
+        
+    rtnl_addr_set_local (addr, nl_addr);
+    nl_addr_put (nl_addr);
+
+    rtnl_addr_set_ifindex (addr, iface_idx);
+    switch (cmd) {
+        case ADD_IP:
+            if ((err = rtnl_addr_add (nlh, addr, 0)) < 0) {
+                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                    "error %d returned from rtnl_addr_add():\n%s\n", err, nl_geterror());
+                ret = -1;
+            } else {
+                ret = 0;
+            }
+            break;
+        case DEL_IP:
+            if ((err = rtnl_addr_delete (nlh, addr, 0)) < 0) {
+                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                    "error %d returned from rtnl_addr_delete():\n%s\n", err, nl_geterror());
+                ret = -1;
+            } else {
+                ret = 0;
+            }
+            break;
+    }
+    
+out:
+    if (addr) {
+        rtnl_addr_put (addr);
+    }
+    if (nlh) {
+        nl_close(nlh);
+        nl_handle_destroy(nlh);
+    }
+    return ret;
+}
+
+/*helpers end*/
 
 switch_status_t utils_add_vip(char *ip,char *dev)
 {
     
     if ((!zstr(ip)) && (!zstr(dev))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"ip addr add %s/32 dev %s",ip, dev);
-	    if (system(cmd)){
+/*        char cmd[128];*/
+/*        switch_snprintf(cmd, sizeof(cmd),"ip addr add %s/32 dev %s",ip, dev);*/
+/*	    if (system(cmd)){*/
+        if (ip_addr(ip,dev, ADD_IP) < 0) {
 	    	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot add IP %s\n", ip);
 	    	return SWITCH_STATUS_FALSE;
 	    }
@@ -52,9 +151,10 @@ switch_status_t utils_remove_vip(char *ip,char *dev)
 {
     
     if ((!zstr(ip)) && (!zstr(dev))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"ip addr del %s/32 dev %s",ip, dev);
-	    if (system(cmd)){
+/*        char cmd[128];*/
+/*        switch_snprintf(cmd, sizeof(cmd),"ip addr del %s/32 dev %s",ip, dev);*/
+/*	    if (system(cmd)){*/
+        if (ip_addr(ip,dev, DEL_IP) < 0) {
 	    	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Cannot remove Ip %s\n", ip);
 	    	return SWITCH_STATUS_FALSE;
 	    }
@@ -102,36 +202,81 @@ switch_status_t utils_remove_arp_rule(char *ip,char *mac)
         return SWITCH_STATUS_FALSE;
     }
 }
+char *utils_get_mac_addr(char *interface)
+{
+    int buflen = 20;
+    char *buf = NULL;
+    struct nl_handle *nlh = NULL;
+    struct nl_cache *cache = NULL;
+    struct rtnl_link *link = NULL;
+    struct nl_addr *addr = NULL;
 
-char *utils_get_mac_addr(char *dev){
-
-	int s;
-    struct ifreq buffer;
-	char *mac,*buf;
-
-    s = socket(PF_INET, SOCK_DGRAM, 0);
-
-    memset(&buffer, 0x00, sizeof(buffer));
-
-    strcpy(buffer.ifr_name, dev);
-
-    ioctl(s, SIOCGIFHWADDR, &buffer);
-
-    close(s);
-	
-	mac = (char * )malloc(18*sizeof(char));
-	buf = (char * )malloc(4*sizeof(char));	
-	
-	strcpy(mac,"");
-	strcpy(buf,"");
-	
-    for( s = 0; s < 6; s++ ){
-        switch_snprintf(buf, sizeof(buf),(s==0)?"%.2x":":%.2x",(unsigned char)buffer.ifr_hwaddr.sa_data[s]);
-        strncat(mac,buf,sizeof(mac));
+    if (zstr(interface)) {
+        return NULL;
     }
-   
-	return strdup(mac);
+    
+    if (init_handle(&nlh) != 0) {
+        return NULL;
+    }
+    
+    if ((cache = rtnl_link_alloc_cache(nlh)) == NULL) {
+        return NULL;
+    }
+
+    if ((link = rtnl_link_get_by_name(cache, interface)) == NULL) {
+        goto mac2str_error2;
+    }
+
+    if ((addr = rtnl_link_get_addr(link)) == NULL) {
+        goto mac2str_error3;
+    }
+
+    if ((buf = calloc(sizeof(char *), buflen)) == NULL) {
+        goto mac2str_error4;
+    }
+
+    buf = nl_addr2str(addr, buf, buflen);
+
+mac2str_error4:
+    nl_addr_destroy(addr);
+mac2str_error3:
+    rtnl_link_put(link);
+mac2str_error2:
+    nl_close(nlh);
+    nl_handle_destroy(nlh);
+
+    return buf;    
 }
+
+/*char *utils_get_mac_addr(char *dev){*/
+
+/*	int s;*/
+/*    struct ifreq buffer;*/
+/*	char *mac,*buf;*/
+
+/*    s = socket(PF_INET, SOCK_DGRAM, 0);*/
+
+/*    memset(&buffer, 0x00, sizeof(buffer));*/
+
+/*    strcpy(buffer.ifr_name, dev);*/
+
+/*    ioctl(s, SIOCGIFHWADDR, &buffer);*/
+
+/*    close(s);*/
+/*	*/
+/*	mac = (char * )malloc(18*sizeof(char));*/
+/*	buf = (char * )malloc(4*sizeof(char));	*/
+/*	*/
+/*	strcpy(mac,"");*/
+/*	strcpy(buf,"");*/
+/*	*/
+/*    for( s = 0; s < 6; s++ ){*/
+/*        switch_snprintf(buf, sizeof(buf),(s==0)?"%.2x":":%.2x",(unsigned char)buffer.ifr_hwaddr.sa_data[s]);*/
+/*        strncat(mac,buf,sizeof(mac));*/
+/*    }*/
+/*   */
+/*	return strdup(mac);*/
+/*}*/
 
 void utils_reloadxml()
 {
