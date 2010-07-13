@@ -37,12 +37,13 @@ conf-install:
 		echo "installing conf file"; \
 		install cpg.conf.xml $(CONFDIR); \
 	fi
-	#echo "installing corosync conf file"; \
-	
+	#echo "installing corosync conf file";
+	mkdir -p $(CORODIR); \	
 	install corosync.conf $(CORODIR); 
 	if [ ! -f $(CORODIR)/uidgid.d/freeswitch.corosync ]; \
 	then \
 		echo "installing corosync uidgig conf file"; \
+		mkdir -p $(CORODIR)/uidgid.d; \
 		install freeswitch.corosync $(CORODIR)/uidgid.d; \
 	fi
 
