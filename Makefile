@@ -1,6 +1,6 @@
 INSTALL_PREFIX?=
 
-CORODIR = /etc/corosync
+CORODIR = $(INSTALL_PREFIX)/etc/corosync
 INSTDIR = $(INSTALL_PREFIX)/opt/freeswitch
 MODDIR = $(INSTDIR)/mod
 CONFDIR = $(INSTDIR)/conf/autoload_configs
