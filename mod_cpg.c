@@ -786,6 +786,9 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 	start_profiles();
     
 	SWITCH_ADD_API(api_interface, "cpg", "cpg API", cpg_function, "syntax");
+	switch_console_set_complete("add cpg help");
+	switch_console_set_complete("add cpg status");
+	switch_console_set_complete("add cpg profile");
 	
 	/* indicate that the module should continue to be loaded */
 	return SWITCH_STATUS_SUCCESS;
@@ -794,7 +797,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
 {	
     
-	//int result;
+	switch_console_set_complete("del cpg");
+
 	stop_profiles();
 	globals.running = 0;
 	switch_event_unbind(&globals.node);
