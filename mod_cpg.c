@@ -956,9 +956,10 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
     switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");
+    globals.is_connected = SWITCH_TRUE;
     
 	while(globals.running) {
-
+        
         if (system(cmd) != 0) {
             globals.is_connected = SWITCH_FALSE;
             stop_profiles();
