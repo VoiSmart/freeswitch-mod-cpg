@@ -49,16 +49,21 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown);
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load);
 
-/* SWITCH_MODULE_DEFINITION(name, load, shutdown, runtime) 
- * Defines a switch_loadable_module_function_table_t and a static const char[] modname
- */
-SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, NULL);
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime);
+/*Defines a switch_loadable_module_function_table_t and a static const char[] modname*/
+SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, mod_cpg_runtime);
 
+void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj);
+void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
 void launch_profile_thread(profile_t *profile);
 static switch_status_t send_state(cpg_handle_t h, profile_t *profile);
 static switch_status_t send_sql(cpg_handle_t h, char *sql);
 static int send_message(cpg_handle_t h, void *buf, int len);
 static char *node_pid_format(unsigned int nodeid);
+void event_handler(switch_event_t *event);
+switch_status_t start_profiles();
+switch_status_t stop_profiles();
+
 static void DeliverCallback (
 	cpg_handle_t handle,
 	const struct cpg_name *groupName,
@@ -74,7 +79,7 @@ static void ConfchgCallback (
 	const struct cpg_address *left_list, size_t left_list_entries,
 	const struct cpg_address *joined_list, size_t joined_list_entries);
 
-void event_handler(switch_event_t *event);
+
 
 static cpg_callbacks_t callbacks = {
 	.cpg_deliver_fn = DeliverCallback,
@@ -648,7 +653,8 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 			if (!profile->running) {
 				
 				launch_profile_thread(profile);
-				
+				profile->autoload = SWITCH_TRUE; 
+                /*se lo accendo metto l'autoload così riparte se c'è una riconnessione*/
 				stream->write_function(stream, "starting %s\n", argv[0]);
 			} else {
 				stream->write_function(stream, "Profile %s already running\n", argv[0]);
@@ -665,7 +671,9 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 				int result;
 				switch_status_t status;
 				stream->write_function(stream, "stopping %s\n", argv[0]);
-				
+				profile->autoload = SWITCH_FALSE; 
+                /*se lo spengo tolgo l'autoload altrimenti riparte se c'è una riconnessione'*/
+        	    
         	    profile->running = 0;
         	    switch_thread_join(&status, profile->profile_thread);
         	    
@@ -935,4 +943,31 @@ static char * node_pid_format(unsigned int nodeid) {
 	sprintf(buffer, "node %s", inet_ntoa(saddr));
 	
 	return buffer;
+}
+
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
+{
+    char cmd[128];
+    
+    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");
+    
+	while(globals.running) {
+
+        if (system(cmd) != 0) {
+            globals.is_connected = SWITCH_FALSE;
+            stop_profiles();
+        } else { //è andato a buon fine
+            if (globals.is_connected == SWITCH_FALSE) { //se ero standby divento init
+                globals.is_connected = SWITCH_TRUE;
+                start_profiles();
+            }
+        }
+            
+        switch_yield(5000000);
+
+	}
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime terminated\n");
+	return SWITCH_STATUS_TERM;
 }

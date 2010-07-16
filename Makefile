@@ -3,6 +3,7 @@ INSTALL_PREFIX?=
 CORODIR = $(INSTALL_PREFIX)/etc/corosync
 INSTDIR = $(INSTALL_PREFIX)/opt/freeswitch
 MODDIR = $(INSTDIR)/mod
+BINDIR = $(INSTDIR)/bin
 CONFDIR = $(INSTDIR)/conf/autoload_configs
 CC=gcc
 INCLUDE= -lcpg -lnl -I$(INSTDIR)/include
@@ -29,6 +30,8 @@ clean:
 install: all conf-install 
 	mkdir -p $(MODDIR); \
 	install *.so $(MODDIR);
+	mkdir -p $(BINDIR); \
+	install arbiter.sh $(BINDIR);
 
 conf-install:
 	mkdir -p $(CONFDIR); \

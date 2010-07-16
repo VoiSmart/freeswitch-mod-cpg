@@ -33,14 +33,12 @@
 struct {
 	switch_memory_pool_t *pool;
 	switch_hash_t *profile_hash;
-	int running;
+	short int running;
+	switch_bool_t is_connected;
 	cpg_handle_t handle;
 	struct cpg_name group_name;
 	switch_event_node_t *node;
 } globals;
 
 
-/*main functions*/
-void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj);
-void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
 #endif
