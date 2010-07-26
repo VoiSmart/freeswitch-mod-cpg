@@ -200,9 +200,11 @@ int net_send_arp( struct ether_addr * mac_source, struct ether_addr * mac_destin
 
 int net_send_arp_string( char * mac_source, char * mac_destination, short unsigned int operation, char * mac_sender, char * ip_sender, char * mac_target, char * ip_target, char * dev ){
 	
+	int result;
+	
 	memcpy( &mac_broadcast, eth_aton("ff:ff:ff:ff:ff:ff"), sizeof( struct ether_addr ) );
 	
-	net_send_arp( eth_aton(mac_source), eth_aton(mac_destination), operation, eth_aton(mac_sender), ip_aton(ip_sender), eth_aton(mac_target), ip_aton(ip_target), ifx_aton(dev) );
+	result = net_send_arp( eth_aton(mac_source), eth_aton(mac_destination), operation, eth_aton(mac_sender), ip_aton(ip_sender), eth_aton(mac_target), ip_aton(ip_target), ifx_aton(dev) );
 	
-	return 0;
+	return result;
 }

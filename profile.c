@@ -40,33 +40,20 @@ profile_t *find_profile_by_name(char *profile_name)
 switch_status_t from_standby_to_init(profile_t *profile) 
 {
     profile->state = INIT;
-    // arptables rule
-/*	if (utils_add_arp_rule(profile->virtual_ip, profile->mac) != SWITCH_STATUS_SUCCESS) {*/
-/*        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed setup!\n");*/
-/*        return SWITCH_STATUS_FALSE;*/
-/*	}*/
-		
-	// set the ip to bind to
-/*	if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed setup!\n");*/
-/*	    goto ip_error;*/
-/*	}*/
 	
 	// start sofia profile
-	if (utils_start_sofia_profile(profile->name)!=SWITCH_STATUS_SUCCESS) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed setup!\n");
-		goto sofia_error;
+	if (utils_start_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS) {
+		goto error;
 	}
 	
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From STANDBY to INIT for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
-	
-sofia_error:
-    utils_remove_vip(profile->virtual_ip, profile->device);
 
-/*ip_error:*/
-/*    utils_remove_arp_rule(profile->virtual_ip, profile->mac);*/
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to INIT!\n");
+	profile->state = STANDBY;
 	return SWITCH_STATUS_FALSE;
+
 }
 
 switch_status_t from_init_to_backup(profile_t *profile)
@@ -79,46 +66,45 @@ switch_status_t from_init_to_backup(profile_t *profile)
 switch_status_t from_init_to_master(profile_t *profile)
 {
     profile->state = MASTER;
-    // remove arptables rule
-/*	if (utils_remove_arp_rule(profile->virtual_ip, profile->mac) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed Reaction!\n");*/
-/*		return SWITCH_STATUS_FALSE;*/
-/*	}*/
 
     // set the ip to bind to
-	if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed setup!\n");
-	    return SWITCH_STATUS_FALSE;
+	if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {  
+	    goto error;
 	}
 
 	// gratuitous arp request
-	net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1, 
-	                    profile->mac, profile->virtual_ip, profile->mac, 
-	                    profile->virtual_ip, profile->device);
+	if (net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1, 
+	                            profile->mac, profile->virtual_ip, profile->mac, 
+	                                profile->virtual_ip, profile->device) < 0) {
+	    utils_remove_vip(profile->virtual_ip, profile->device);
+	    goto error;
+	}
 	
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to MASTER for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
+    profile->state = STANDBY;
+	return SWITCH_STATUS_FALSE;
 }
 
 switch_status_t from_backup_to_master(profile_t *profile)
 {
     profile->state = MASTER;
-    // remove arptables rule
-/*	if (utils_remove_arp_rule(profile->virtual_ip, profile->mac) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed Reaction!\n");*/
-/*		return SWITCH_STATUS_FALSE;*/
-/*	}*/
     
     // set the ip to bind to
 	if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed setup!\n");
-	    return SWITCH_STATUS_FALSE;
+	    goto error;
 	}
 	
 	// gratuitous arp request
-	net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1, 
-	                    profile->mac, profile->virtual_ip, profile->mac, 
-	                    profile->virtual_ip, profile->device);
+	if (net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1, 
+	                            profile->mac, profile->virtual_ip, profile->mac, 
+	                                profile->virtual_ip, profile->device) < 0) {
+	    utils_remove_vip(profile->virtual_ip, profile->device);
+	    goto error;
+	}
 	
 	// sofia recover!!!
 	if (profile->autorecover == SWITCH_TRUE) {
@@ -126,6 +112,11 @@ switch_status_t from_backup_to_master(profile_t *profile)
     }
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to MASTER for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
+	profile->state = STANDBY;
+	return SWITCH_STATUS_FALSE;
 }
 
 switch_status_t from_master_to_standby(profile_t *profile)
@@ -134,18 +125,20 @@ switch_status_t from_master_to_standby(profile_t *profile)
     profile->master_id = 0;
     profile->member_list_entries = 0;
     if (utils_remove_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");
-	    return SWITCH_STATUS_FALSE;
+	    goto error;
 	}
 	
 	// stop sofia profile
 	if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");
-		return SWITCH_STATUS_FALSE;
+		goto error;
 	}
 	
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From MASTER to STANDBY for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
+	return SWITCH_STATUS_FALSE;
 }
 
 switch_status_t from_backup_to_standby(profile_t *profile)
@@ -153,25 +146,18 @@ switch_status_t from_backup_to_standby(profile_t *profile)
     profile->state = STANDBY;
     profile->master_id = 0;
     profile->member_list_entries = 0;
-/*    if (utils_remove_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");*/
-/*	    return SWITCH_STATUS_FALSE;*/
-/*	}*/
-	
-	// remove arptables rule
-/*	if (utils_remove_arp_rule(profile->virtual_ip, profile->mac) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");*/
-/*	    return SWITCH_STATUS_FALSE;*/
-/*	}*/
-	
+
 	// stop sofia profile
 	if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");
-		return SWITCH_STATUS_FALSE;
+		goto error;
 	}
 	
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to STANDBY for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
+	return SWITCH_STATUS_FALSE;
 }
 
 switch_status_t from_init_to_standby(profile_t *profile)
@@ -179,25 +165,18 @@ switch_status_t from_init_to_standby(profile_t *profile)
     profile->state = STANDBY;
     profile->master_id = 0;
     profile->member_list_entries = 0;
-/*    if (utils_remove_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");*/
-/*	    return SWITCH_STATUS_FALSE;*/
-/*	}*/
-	
-	// remove arptables rule
-/*	if (utils_remove_arp_rule(profile->virtual_ip, profile->mac) != SWITCH_STATUS_SUCCESS) {*/
-/*	    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");*/
-/*	    return SWITCH_STATUS_FALSE;*/
-/*	}*/
-	
+
 	// stop sofia profile
 	if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed!\n");
-		return SWITCH_STATUS_FALSE;
+		goto error;
 	}
 	
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to STANDBY for %s!\n", profile->name);
 	return SWITCH_STATUS_SUCCESS;
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
+	return SWITCH_STATUS_FALSE;
 }
 
 node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority) 
