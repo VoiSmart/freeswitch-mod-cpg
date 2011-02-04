@@ -81,7 +81,12 @@ int ip_addr(char *ip4addr, char *interface, cmd_t cmd)
         return -1;
     }
 
-    inet_pton(AF_INET, ip4addr, &binaddr);
+    if (inet_pton(AF_INET, ip4addr, &binaddr) == 0) {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                                                      "not valid ip address\n");
+        ret = -1;
+        goto out;
+    }
 
     nl_addr = nl_addr_build (AF_INET, &binaddr, sizeof(binaddr));
     if (!nl_addr) {
