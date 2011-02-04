@@ -508,7 +508,6 @@ static void ConfchgCallback (
                         from_backup_to_master(profile);
                         // and I say it to all other nodes
                         send_state(handle, profile);
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "I'm your MASTER!\n");
                     } else {
                         // clean up the table
                         char *sql;
@@ -541,7 +540,6 @@ static void ConfchgCallback (
                     // I'm the master
                     from_init_to_master(profile);
                     send_state(handle, profile);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "I'm your MASTER!\n");
                 }
                 // else I have to fill priority table
                 break;
