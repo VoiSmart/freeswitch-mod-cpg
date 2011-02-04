@@ -95,9 +95,15 @@ int ip_addr(char *ip4addr, char *interface, cmd_t cmd)
     rtnl_addr_set_ifindex (addr, iface_idx);
     switch (cmd) {
         case ADD_IP:
-            if ((err = rtnl_addr_add (nlh, addr, 0)) < 0) {
+            err = rtnl_addr_add (nlh, addr, 0);
+            if ( err == -17 ) {
+                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+                         "%s is already on %s interface\n", ip4addr, interface);
+                ret = 0;
+            } else if ( err < 0 ) {
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                    "error %d returned from rtnl_addr_add():\n%s\n", err, nl_geterror());
+                                "error %d returned from rtnl_addr_add():\n%s\n",
+                                                            err, nl_geterror());
                 ret = -1;
             } else {
                 ret = 0;
@@ -106,7 +112,8 @@ int ip_addr(char *ip4addr, char *interface, cmd_t cmd)
         case DEL_IP:
             if ((err = rtnl_addr_delete (nlh, addr, 0)) < 0) {
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                    "error %d returned from rtnl_addr_delete():\n%s\n", err, nl_geterror());
+                             "error %d returned from rtnl_addr_delete():\n%s\n",
+                                                            err, nl_geterror());
                 ret = -1;
             } else {
                 ret = 0;
