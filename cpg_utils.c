@@ -115,7 +115,12 @@ int ip_addr(char *ip4addr, char *interface, cmd_t cmd)
             }
             break;
         case DEL_IP:
-            if ((err = rtnl_addr_delete (nlh, addr, 0)) < 0) {
+            err = rtnl_addr_delete (nlh, addr, 0);
+            if (err == -99) {
+                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+                     "%s is not present on %s interface\n", ip4addr, interface);
+                ret = 0;
+            } else if (err < 0) {
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                              "error %d returned from rtnl_addr_delete():\n%s\n",
                                                             err, nl_geterror());
