@@ -149,7 +149,7 @@ static switch_status_t do_config()
                     switch_snprintf(profile->device,6,"%s",val);
                     //get local mac address
                     mac = utils_get_mac_addr(profile->device);
-                    
+
                     if (profile->device == NULL || mac == NULL) {
                         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                             "Profile %s: Interface is not valid\n", profile->name);
