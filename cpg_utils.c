@@ -459,4 +459,15 @@ int utils_count_profile_channels(char *profile_name)
     return count;
 }
 
+char * utils_node_pid_format(unsigned int nodeid) {
+    static char buffer[100];
+    struct in_addr saddr;
+#if __BYTE_ORDER == __BIG_ENDIAN
+    saddr.s_addr = swab32(nodeid);
+#else
+    saddr.s_addr = nodeid;
+#endif
+    sprintf(buffer, "node %s", inet_ntoa(saddr));
 
+    return buffer;
+}

@@ -17,7 +17,7 @@
  * Voismart Srl
  * Via Benigno Crespi 12
  * 20159 Milano - MI
- * ITALY 
+ * ITALY
  *
  * Phone : +39.02.70633354
  *
@@ -49,4 +49,6 @@ void utils_send_track_event(char *sql, char *profile_name);
 switch_status_t utils_recover(char *profile_name);
 int utils_count_profile_channels(char *profile_name);
 
+/*corosync utils*/
+char *utils_node_pid_format(unsigned int nodeid);
 #endif
