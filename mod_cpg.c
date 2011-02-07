@@ -59,7 +59,6 @@ void launch_profile_thread(profile_t *profile);
 static switch_status_t send_state(cpg_handle_t h, profile_t *profile);
 static switch_status_t send_sql(cpg_handle_t h, char *sql);
 static int send_message(cpg_handle_t h, void *buf, int len);
-static char *node_pid_format(unsigned int nodeid);
 void event_handler(switch_event_t *event);
 switch_status_t start_profiles();
 switch_status_t stop_profiles();
@@ -958,19 +957,6 @@ static int send_message(cpg_handle_t h, void *buf, int len)
               retries);
 
     return 0;
-}
-
-static char * node_pid_format(unsigned int nodeid) {
-    static char buffer[100];
-    struct in_addr saddr;
-#if __BYTE_ORDER == __BIG_ENDIAN
-    saddr.s_addr = swab32(nodeid);
-#else
-    saddr.s_addr = nodeid;
-#endif
-    sprintf(buffer, "node %s", inet_ntoa(saddr));
-
-    return buffer;
 }
 
 SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
