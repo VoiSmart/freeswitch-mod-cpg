@@ -690,6 +690,8 @@ switch_status_t stop_profiles_with_ip(char *profile_ip)
                                         "Found profile %s with virtual ip %s\n",
                                             profile->name, profile->virtual_ip);
 
+            profile->autoload = SWITCH_FALSE;
+            /*se lo spengo tolgo l'autoload altrimenti riparte se c'è una riconnessione'*/
             profile->running = 0;
             switch_thread_join(&status, profile->profile_thread);
 
@@ -744,8 +746,6 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
         if (profile != NULL) {
             if (profile->running) {
                 stream->write_function(stream, "stopping %s\n", argv[0]);
-                profile->autoload = SWITCH_FALSE;
-                /*se lo spengo tolgo l'autoload altrimenti riparte se c'è una riconnessione'*/
 
                 stop_profiles_with_ip(profile->virtual_ip);
             } else {
