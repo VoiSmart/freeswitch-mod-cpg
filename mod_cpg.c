@@ -947,7 +947,7 @@ void event_handler(switch_event_t *event)
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",profile->name);
             send_sql(profile->handle,sql);
         } else {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profilo non trovato!\n");
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
         }
 
     }
