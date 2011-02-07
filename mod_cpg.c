@@ -611,13 +611,15 @@ switch_status_t start_profiles()
     const void *vvar;
     profile_t *profile = NULL;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; hi = switch_hash_next(hi))
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
+                                                      hi = switch_hash_next(hi))
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
         profile = (profile_t *) val;
         if (profile->autoload == SWITCH_TRUE) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"launch %s\n", profile->name);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                                                  "launch %s\n", profile->name);
             launch_profile_thread(profile);
         }
     }
@@ -728,10 +730,12 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
                 /*se lo accendo metto l'autoload così riparte se c'è una riconnessione*/
                 stream->write_function(stream, "starting %s\n", argv[0]);
             } else {
-                stream->write_function(stream, "Profile %s already running\n", argv[0]);
+                stream->write_function(stream,
+                                       "Profile %s already running\n", argv[0]);
             }
         } else {
-            stream->write_function(stream, "Failure starting %s, invalid profile\n", argv[0]);
+            stream->write_function(stream,
+                             "Failure starting %s, invalid profile\n", argv[0]);
         }
         goto done;
     }
@@ -745,10 +749,12 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 
                 stop_profiles_with_ip(profile->virtual_ip);
             } else {
-                stream->write_function(stream, "Profile %s not running\n", argv[0]);
+                stream->write_function(stream,
+                                           "Profile %s not running\n", argv[0]);
             }
         } else {
-            stream->write_function(stream, "Failure stopping %s, invalid profile\n", argv[0]);
+            stream->write_function(stream,
+                             "Failure stopping %s, invalid profile\n", argv[0]);
         }
         goto done;
     }
@@ -758,6 +764,7 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
     done:
         return SWITCH_STATUS_SUCCESS;
 }
+
 SWITCH_STANDARD_API(cpg_function)
 {
 
