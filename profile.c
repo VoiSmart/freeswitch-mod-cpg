@@ -179,6 +179,30 @@ error:
     return SWITCH_STATUS_FALSE;
 }
 
+switch_status_t go_to_standby(profile_t *profile)
+{
+    switch_status_t status = SWITCH_STATUS_FALSE;
+
+    if (!profile)
+        return status;
+
+    switch(profile->state) {
+        case MASTER:
+            status = from_master_to_standby(profile);
+            break;
+        case BACKUP:
+            status = from_backup_to_standby(profile);
+            break;
+        case INIT:
+            status = from_init_to_standby(profile);
+            break;
+        case STANDBY:
+            status = SWITCH_STATUS_SUCCESS;
+            break;
+    }
+    return status;
+}
+
 node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority)
 {
 

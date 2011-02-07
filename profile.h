@@ -76,6 +76,8 @@ switch_status_t from_master_to_standby(profile_t *profile);
 switch_status_t from_backup_to_standby(profile_t *profile);
 switch_status_t from_init_to_standby(profile_t *profile);
 
+switch_status_t go_to_standby(profile_t *profile);
+
 node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority);
 node_t *node_remove(node_t *oldlist, uint32_t nodeid);
 switch_status_t node_remove_all(node_t *list);
