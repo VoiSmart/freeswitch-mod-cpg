@@ -634,7 +634,7 @@ switch_status_t stop_profiles()
     profile_t *profile = NULL;
     switch_status_t status;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; 
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
                                                       hi = switch_hash_next(hi))
     {
 
@@ -675,14 +675,14 @@ switch_status_t stop_profiles_with_ip(char *profile_ip)
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
                "Searching for profile with shared virtual ip %s\n", profile_ip);
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; 
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
                                                       hi = switch_hash_next(hi))
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
         profile = (profile_t *) val;
 
-        if ((profile->running) && 
+        if ((profile->running) &&
                                 (!strcasecmp(profile->virtual_ip, profile_ip))){
             int result;
 
@@ -765,6 +765,45 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
         return SWITCH_STATUS_SUCCESS;
 }
 
+static switch_status_t validate_config()
+{
+    switch_hash_index_t *hi1, *hi2;
+    void *val1, *val2;
+    const void *vvar1, *vvar2;
+    profile_t *profile1 = NULL, *profile2 = NULL;
+    for (hi1 = switch_hash_first(NULL, globals.profile_hash); hi1;
+                                                    hi1 = switch_hash_next(hi1))
+    {
+
+        switch_hash_this(hi1, &vvar1, NULL, &val1);
+        profile1 = (profile_t *) val1;
+        for (hi2 = switch_hash_first(NULL, globals.profile_hash); hi2;
+                                                    hi2 = switch_hash_next(hi2))
+        {
+
+            switch_hash_this(hi2, &vvar2, NULL, &val2);
+            profile2 = (profile_t *) val2;
+            if (strcasecmp(profile2->name, profile1->name) &&
+               !strcasecmp(profile2->virtual_ip, profile1->virtual_ip)) {
+                    if (profile2->priority != profile1->priority) {
+                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                             "Bad configuration! Shared virtual ip %s must "
+                             "have the same priority!\n", profile2->virtual_ip);
+                        return SWITCH_STATUS_FALSE;
+                    }
+                    if (profile2->device != profile1->device) {
+                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                             "Bad configuration! Shared virtual ip %s must "
+                             "have the same device!\n", profile2->virtual_ip);
+                        return SWITCH_STATUS_FALSE;
+                    }
+                }
+        
+        }
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
+
 SWITCH_STANDARD_API(cpg_function)
 {
 
@@ -823,7 +862,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
     memset(&globals, 0, sizeof(globals));
 
     /* connect my internal structure to the blank pointer passed to me */
-    *module_interface = switch_loadable_module_create_module_interface(pool, modname);
+    *module_interface =
+                  switch_loadable_module_create_module_interface(pool, modname);
 
     globals.pool = pool;
 
@@ -833,8 +873,17 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
         return SWITCH_STATUS_TERM;
     }
 
-    if (switch_event_bind_removable(modname, SWITCH_EVENT_CUSTOM, "sofia::recovery_send", event_handler, NULL, &globals.node) != SWITCH_STATUS_SUCCESS) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Couldn't bind!\n");
+    if (validate_config() != SWITCH_STATUS_SUCCESS) {
+        return SWITCH_STATUS_TERM;
+    }
+
+    if (switch_event_bind_removable(modname, SWITCH_EVENT_CUSTOM,
+                                    "sofia::recovery_send",
+                                    event_handler, NULL,
+                                    &globals.node) != SWITCH_STATUS_SUCCESS) {
+
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                                                            "Couldn't bind!\n");
         return SWITCH_STATUS_TERM;
     }
 
