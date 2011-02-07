@@ -62,6 +62,7 @@ static int send_message(cpg_handle_t h, void *buf, int len);
 void event_handler(switch_event_t *event);
 switch_status_t start_profiles();
 switch_status_t stop_profiles();
+switch_status_t stop_profiles_with_ip(char *profile_ip);
 
 static void DeliverCallback (
     cpg_handle_t handle,
@@ -631,7 +632,8 @@ switch_status_t stop_profiles()
     profile_t *profile = NULL;
     switch_status_t status;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; hi = switch_hash_next(hi))
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; 
+                                                      hi = switch_hash_next(hi))
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
@@ -640,29 +642,69 @@ switch_status_t stop_profiles()
             int result;
             profile->running = 0;
             switch_thread_join(&status, profile->profile_thread);
-            switch(profile->state) {
-                case MASTER:
-                    from_master_to_standby(profile);
-                    break;
-                case BACKUP:
-                    from_backup_to_standby(profile);
-                    break;
-                case INIT:
-                    from_init_to_standby(profile);
-                    break;
-                case STANDBY:
-                    break;
-            }
+
+            go_to_standby(profile);
+
             result = cpg_leave(profile->handle, &profile->group_name);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"Leave  result is %d (should be 1)\n", result);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                                 "Leave  result is %d (should be 1)\n", result);
             switch_yield(10000);
             result = cpg_finalize (profile->handle);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"Finalize  result is %d (should be 1)\n", result);
-            printf("thread finito\n");
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                              "Finalize  result is %d (should be 1)\n", result);
         }
     }
     return SWITCH_STATUS_SUCCESS;
 }
+
+switch_status_t stop_profiles_with_ip(char *profile_ip)
+{
+    switch_hash_index_t *hi;
+    void *val;
+    const void *vvar;
+    profile_t *profile = NULL;
+    switch_status_t status = SWITCH_STATUS_FALSE;
+
+    if (zstr(profile_ip)) {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"IP == NULL!\n");
+        return SWITCH_STATUS_FALSE;
+    }
+
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+               "Searching for profile with shared virtual ip %s\n", profile_ip);
+
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; 
+                                                      hi = switch_hash_next(hi))
+    {
+
+        switch_hash_this(hi, &vvar, NULL, &val);
+        profile = (profile_t *) val;
+
+        if ((profile->running) && 
+                                (!strcasecmp(profile->virtual_ip, profile_ip))){
+            int result;
+
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+                                        "Found profile %s with virtual ip %s\n",
+                                            profile->name, profile->virtual_ip);
+
+            profile->running = 0;
+            switch_thread_join(&status, profile->profile_thread);
+
+            go_to_standby(profile);
+
+            result = cpg_leave(profile->handle, &profile->group_name);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                                 "Leave  result is %d (should be 1)\n", result);
+            switch_yield(10000);
+            result = cpg_finalize (profile->handle);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                              "Finalize  result is %d (should be 1)\n", result);
+        }
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
+
 switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream)
 {
 
@@ -697,34 +739,11 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 
         if (profile != NULL) {
             if (profile->running) {
-                int result;
-                switch_status_t status;
                 stream->write_function(stream, "stopping %s\n", argv[0]);
                 profile->autoload = SWITCH_FALSE;
                 /*se lo spengo tolgo l'autoload altrimenti riparte se c'è una riconnessione'*/
 
-                profile->running = 0;
-                switch_thread_join(&status, profile->profile_thread);
-
-                switch(profile->state) {
-                    case MASTER:
-                        from_master_to_standby(profile);
-                        break;
-                    case BACKUP:
-                        from_backup_to_standby(profile);
-                        break;
-                    case INIT:
-                        from_init_to_standby(profile);
-                        break;
-                    case STANDBY:
-                        break;
-                }
-
-                result = cpg_leave(profile->handle, &profile->group_name);
-                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"Leave  result is %d (should be 1)\n", result);
-                switch_yield(10000);
-                result = cpg_finalize (profile->handle);
-                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"Finalize  result is %d (should be 1)\n", result);
+                stop_profiles_with_ip(profile->virtual_ip);
             } else {
                 stream->write_function(stream, "Profile %s not running\n", argv[0]);
             }
