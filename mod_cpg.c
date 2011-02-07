@@ -230,7 +230,7 @@ void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj)
     local_id = profile->rollback_node_id;
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                             "Rollback thread for %s started, waiting for %s!\n",
-                                      profile->name, node_pid_format(local_id));
+                                profile->name, utils_node_pid_format(local_id));
 
     for (int i = 0;i < profile->rollback_delay * 60; i++) {
         switch_yield(1000000);
@@ -454,7 +454,7 @@ static void DeliverCallback (
     }
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"DeliverCallback: message (len=%lu)from %s\n",
-               (unsigned long int) msg_len, node_pid_format(nodeid));
+               (unsigned long int) msg_len, utils_node_pid_format(nodeid));
 }
 
 static void ConfchgCallback (
@@ -562,32 +562,40 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     const char *line = "=================================================================================================";
     const char *line2 = "-------------------------------------------------------------------------------------------------";
 
-    stream->write_function(stream, "%25s\t  %20s\t  %10s\t \n", "Name", "Ip", "State");
+    stream->write_function(stream, "%25s\t  %20s\t  %10s\t \n",
+                                                         "Name", "Ip", "State");
     stream->write_function(stream, "%s\n", line);
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; hi = switch_hash_next(hi)) {
+    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
+                                                    hi = switch_hash_next(hi)) {
         node_t *list;
         switch_hash_this(hi, &vvar, NULL, &val);
         profile = (profile_t *) val;
         list = profile->node_list;
 
-        stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n", profile->name, profile->virtual_ip, utils_state_to_string(profile->state), profile->running?"":" not");
+        stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n",
+                                             profile->name, profile->virtual_ip,
+                                          utils_state_to_string(profile->state),
+                                                    profile->running?"":" not");
         stream->write_function(stream, "%s\n", line2);
-        stream->write_function(stream,"\tMy master is %s\n", node_pid_format(profile->master_id));
+        stream->write_function(stream,"\tMy master is %s\n",
+                                     utils_node_pid_format(profile->master_id));
         stream->write_function(stream, "%s\n", line2);
         if (list == NULL)
             stream->write_function(stream,"\tEmpty list\n");
         while (list != NULL) {
-            stream->write_function(stream,"\t%s priority %d\n",node_pid_format(list->nodeid), list->priority);
+            stream->write_function(stream,"\t%s priority %d\n",
+                           utils_node_pid_format(list->nodeid), list->priority);
             list = list->next;
         }
         stream->write_function(stream, "%s\n", line2);
         stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(profile->name));
         if (profile->rollback_node_id != 0) {
             stream->write_function(stream, "%s\n", line2);
-            stream->write_function(stream,"\tRollback timer started, migration to %s\n", node_pid_format(profile->rollback_node_id));
+            stream->write_function(stream,
+                                  "\tRollback timer started, migration to %s\n",
+                              utils_node_pid_format(profile->rollback_node_id));
         }
         stream->write_function(stream, "%s\n", line);
-        //stream->write_function(stream, "lista nodi %d membri lista%d\n",list_entries(profile->node_list), profile->member_list_entries);
 
     }
     stream->write_function(stream, "%s\n", line);
