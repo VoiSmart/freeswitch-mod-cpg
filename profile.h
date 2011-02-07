@@ -17,7 +17,7 @@
  * Voismart Srl
  * Via Benigno Crespi 12
  * 20159 Milano - MI
- * ITALY 
+ * ITALY
  *
  * Phone : +39.02.70633354
  *
@@ -43,27 +43,27 @@ typedef struct node {
 } node_t;
 
 typedef struct {
-	char name[255];
-	char virtual_ip[16];
-	profile_state_t state;
-	char device[10];
-	char mac[18];
-	switch_thread_t *profile_thread;
-	short int running;
-	cpg_handle_t handle;
-	struct cpg_name group_name;
-	int members_number;
-	int priority;
-	uint32_t node_id;
-	uint32_t master_id;
-	char runtime_uuid[40];
-	uint32_t rollback_node_id;
-	node_t *node_list;
-	size_t member_list_entries;
-	switch_bool_t autoload;
-	switch_bool_t autorecover;
-	switch_bool_t autorollback;
-	int rollback_delay;
+    char name[255];
+    char virtual_ip[16];
+    profile_state_t state;
+    char device[10];
+    char mac[18];
+    switch_thread_t *profile_thread;
+    short int running;
+    cpg_handle_t handle;
+    struct cpg_name group_name;
+    int members_number;
+    int priority;
+    uint32_t node_id;
+    uint32_t master_id;
+    char runtime_uuid[40];
+    uint32_t rollback_node_id;
+    node_t *node_list;
+    size_t member_list_entries;
+    switch_bool_t autoload;
+    switch_bool_t autorecover;
+    switch_bool_t autorollback;
+    int rollback_delay;
 } profile_t;
 
 profile_t *find_profile_by_name(char *profile_name);
