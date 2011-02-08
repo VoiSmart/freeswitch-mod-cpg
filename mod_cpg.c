@@ -791,7 +791,7 @@ static switch_status_t validate_config()
                              "have the same priority!\n", profile2->virtual_ip);
                         return SWITCH_STATUS_FALSE;
                     }
-                    if (profile2->device != profile1->device) {
+                    if (strcasecmp(profile2->device, profile1->device)) {
                         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                              "Bad configuration! Shared virtual ip %s must "
                              "have the same device!\n", profile2->virtual_ip);
