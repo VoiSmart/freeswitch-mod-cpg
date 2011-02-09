@@ -42,8 +42,11 @@ switch_status_t from_standby_to_init(profile_t *profile)
     profile->state = INIT;
 
     // start sofia profile
-    if (utils_start_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS) {
-        goto error;
+    for (int i=0; i<3; i++) {
+        switch_yield(100000);
+        if (utils_start_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS) {
+            goto error;
+        }
     }
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From STANDBY to INIT for %s!\n", profile->name);
