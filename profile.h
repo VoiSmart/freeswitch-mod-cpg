@@ -68,6 +68,7 @@ profile_t *find_profile_by_name(char *profile_name);
 
 switch_status_t profile_start(profile_t *profile);
 switch_status_t profile_stop(profile_t *profile);
-switch_status_t profile_send_sql(cpg_handle_t h, char *sql);
-switch_status_t profile_send_state(cpg_handle_t h, profile_t *profile);
+switch_status_t profile_send_sql(profile_t *profile, char *sql);
+switch_status_t profile_send_state(profile_t *profile);
+
 #endif

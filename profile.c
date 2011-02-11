@@ -388,7 +388,7 @@ static void ConfchgCallback (
                         // become master
                         from_backup_to_master(profile);
                         // and I say it to all other nodes
-                        profile_send_state(handle, profile);
+                        profile_send_state(profile);
                     } else {
                         // clean up the table
                         char *sql;
@@ -412,7 +412,7 @@ static void ConfchgCallback (
     if (joined_list_entries > 0) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "JOIN!\n");
         // if someone has joined I send him my infos
-        profile_send_state(handle,profile);
+        profile_send_state(profile);
 
         switch (profile->state) {
             case INIT:
@@ -420,7 +420,7 @@ static void ConfchgCallback (
                 if (member_list_entries == 1) {
                     // I'm the master
                     from_init_to_master(profile);
-                    profile_send_state(handle, profile);
+                    profile_send_state(profile);
                 }
                 // else I have to fill priority table
                 break;
@@ -436,7 +436,7 @@ static void ConfchgCallback (
 }
 
 
-switch_status_t profile_send_sql(cpg_handle_t h, char *sql)
+switch_status_t profile_send_sql(profile_t *profile, char *sql)
 {
     header_t *hd;
     char *buf;
@@ -454,13 +454,13 @@ switch_status_t profile_send_sql(cpg_handle_t h, char *sql)
 
     memcpy(buf+sizeof(header_t), sql, strlen(sql) + 1);
 
-    send_message(h,buf,len);
+    send_message(profile->handle,buf,len);
 
     free(buf);
 
     return SWITCH_STATUS_SUCCESS;
 }
-switch_status_t profile_send_state(cpg_handle_t h, profile_t *profile)
+switch_status_t profile_send_state(profile_t *profile)
 {
     header_t *hd;
     node_msg_t *nm;
@@ -483,7 +483,7 @@ switch_status_t profile_send_state(cpg_handle_t h, profile_t *profile)
     nm->priority = profile->priority;
     switch_snprintf(nm->runtime_uuid,sizeof(nm->runtime_uuid),"%s",switch_core_get_uuid());
 
-    send_message(h,buf,len);
+    send_message(profile->handle,buf,len);
 
     free(buf);
 

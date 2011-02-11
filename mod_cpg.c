@@ -259,44 +259,6 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
         return SWITCH_STATUS_SUCCESS;
 }
 
-static switch_status_t validate_config()
-{
-    switch_hash_index_t *hi1, *hi2;
-    void *val1, *val2;
-    const void *vvar1, *vvar2;
-    profile_t *profile1 = NULL, *profile2 = NULL;
-    for (hi1 = switch_hash_first(NULL, globals.profile_hash); hi1;
-                                                    hi1 = switch_hash_next(hi1))
-    {
-
-        switch_hash_this(hi1, &vvar1, NULL, &val1);
-        profile1 = (profile_t *) val1;
-        for (hi2 = switch_hash_first(NULL, globals.profile_hash); hi2;
-                                                    hi2 = switch_hash_next(hi2))
-        {
-
-            switch_hash_this(hi2, &vvar2, NULL, &val2);
-            profile2 = (profile_t *) val2;
-            if (strcasecmp(profile2->name, profile1->name) &&
-               !strcasecmp(profile2->virtual_ip, profile1->virtual_ip)) {
-                    if (profile2->priority != profile1->priority) {
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                             "Bad configuration! Shared virtual ip %s must "
-                             "have the same priority!\n", profile2->virtual_ip);
-                        return SWITCH_STATUS_FALSE;
-                    }
-                    if (strcasecmp(profile2->device, profile1->device)) {
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                             "Bad configuration! Shared virtual ip %s must "
-                             "have the same device!\n", profile2->virtual_ip);
-                        return SWITCH_STATUS_FALSE;
-                    }
-                }
-        
-        }
-    }
-    return SWITCH_STATUS_SUCCESS;
-}
 
 SWITCH_STANDARD_API(cpg_function)
 {
@@ -367,10 +329,6 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
         return SWITCH_STATUS_TERM;
     }
 
-    if (validate_config() != SWITCH_STATUS_SUCCESS) {
-        return SWITCH_STATUS_TERM;
-    }
-
     if (switch_event_bind_removable(modname, SWITCH_EVENT_CUSTOM,
                                     "sofia::recovery_send",
                                     event_handler, NULL,
@@ -420,7 +378,7 @@ switch_status_t profiles_state_notification()
         profile = (profile_t *) val;
         if (profile->running) {
 
-            profile_send_state(profile->handle, profile);
+            profile_send_state(profile);
 
         }
     }
@@ -439,7 +397,7 @@ void event_handler(switch_event_t *event)
 
         if ((profile = find_profile_by_name(profile_name))) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",profile->name);
-            profile_send_sql(profile->handle,sql);
+            profile_send_sql(profile,sql);
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
         }
