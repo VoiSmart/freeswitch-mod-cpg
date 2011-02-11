@@ -31,6 +31,7 @@
 #include <netlink/route/link.h>
 
 #include "profile.h"
+#include "arpator.h"
 
 typedef enum {
     ADD_IP,
@@ -470,4 +471,37 @@ char * utils_node_pid_format(unsigned int nodeid) {
     sprintf(buffer, "node %s", inet_ntoa(saddr));
 
     return buffer;
+}
+
+switch_bool_t utils_ip_is_valid(char *address) {
+
+    unsigned char buf[sizeof(struct in6_addr)];
+    int s;
+
+    if (!address)
+        return SWITCH_FALSE;
+//TODO controlla anche ipv6
+    s = inet_pton(AF_INET, address, buf);
+
+    if (s != 1)
+        return SWITCH_FALSE;
+
+    return SWITCH_TRUE;
+
+}
+int utils_get_netmask(char *netmask) {
+
+    int nm = atoi(netmask);
+    return (nm <= 0 || nm > 32)? 32: nm;
+
+}
+
+switch_status_t send_gARP(char *mac, char *address, char *device) {
+    int ret = net_send_arp_string(mac, "ff:ff:ff:ff:ff:ff", 1,
+                                  mac,address,mac, address, device);
+    if (ret == 0)
+        return SWITCH_STATUS_SUCCESS;
+
+    return SWITCH_STATUS_FALSE;
+
 }

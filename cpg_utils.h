@@ -34,6 +34,9 @@ switch_status_t utils_remove_vip(char *ip,char *dev);
 switch_status_t utils_add_arp_rule(char *ip,char *mac);
 switch_status_t utils_remove_arp_rule(char *ip,char *mac);
 char *utils_get_mac_addr(char *dev);
+switch_bool_t utils_ip_is_valid(char *address);
+int utils_get_netmask(char *netmask);
+
 
 /*local utils*/
 char *utils_state_to_string(profile_state_t pstate);
