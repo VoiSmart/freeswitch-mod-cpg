@@ -58,7 +58,7 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     stream->write_function(stream, "%25s\t  %20s\t  %10s\t \n",
                                                          "Name", "Ip", "State");
     stream->write_function(stream, "%s\n", line);
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
                                                     hi = switch_hash_next(hi)) {
         node_t *list;
         switch_hash_this(hi, &vvar, NULL, &val);
@@ -103,7 +103,7 @@ switch_status_t start_profiles()
     const void *vvar;
     virtual_ip_t *vip = NULL;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
                                                       hi = switch_hash_next(hi))
     {
 
@@ -126,7 +126,7 @@ switch_status_t stop_virtual_ips()
     virtual_ip_t *vip = NULL;
     switch_status_t status;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
                                                       hi = switch_hash_next(hi))
     {
 
@@ -274,7 +274,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 
     globals.pool = pool;
 
-    switch_core_hash_init(&globals.profile_hash, globals.pool);
+    switch_core_hash_init(&globals.virtual_ip_hash, globals.pool);
 
     if (do_config("cpg.conf") != SWITCH_STATUS_SUCCESS) {
         return SWITCH_STATUS_TERM;
@@ -311,7 +311,7 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
     stop_virtual_ips();
     globals.running = 0;
     switch_event_unbind(&globals.node);
-    switch_core_hash_destroy(&globals.profile_hash);
+    switch_core_hash_destroy(&globals.virtual_ip_hash);
 
     return SWITCH_STATUS_SUCCESS;
 }
@@ -323,7 +323,7 @@ switch_status_t profiles_state_notification()
     const void *vvar;
     virtual_ip_t *vip = NULL;
 
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi; hi = switch_hash_next(hi)) {
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
 
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;

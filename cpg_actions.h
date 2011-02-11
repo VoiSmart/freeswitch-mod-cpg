@@ -25,17 +25,17 @@
 #ifndef CPG_ACTIONS_H
 #define CPG_ACTIONS_H
 
-#include "cpg_profile.h"
+#include "cpg_virtual_ip.h"
 
-switch_status_t from_standby_to_init(profile_t *profile);
-switch_status_t from_init_to_backup(profile_t *profile);
-switch_status_t from_init_to_master(profile_t *profile);
-switch_status_t from_backup_to_master(profile_t *profile);
-switch_status_t from_master_to_standby(profile_t *profile);
-switch_status_t from_backup_to_standby(profile_t *profile);
-switch_status_t from_init_to_standby(profile_t *profile);
+switch_status_t from_standby_to_init(virtual_ip_t *vip);
+switch_status_t from_init_to_backup(virtual_ip_t *vip);
+switch_status_t from_init_to_master(virtual_ip_t *vip);
+switch_status_t from_backup_to_master(virtual_ip_t *vip);
+switch_status_t from_master_to_standby(virtual_ip_t *vip);
+switch_status_t from_backup_to_standby(virtual_ip_t *vip);
+switch_status_t from_init_to_standby(virtual_ip_t *vip);
 
-switch_status_t go_to_standby(profile_t *profile);
+switch_status_t go_to_standby(virtual_ip_t *vip);
 
 
 #endif

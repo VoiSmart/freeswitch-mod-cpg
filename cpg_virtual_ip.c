@@ -23,7 +23,7 @@
  *
  */
 
-#include "cpg_profile.h"
+#include "cpg_virtual_ip.h"
 
 #include <switch.h>
 #include "cpg_utils.h"
@@ -31,7 +31,7 @@
 
 typedef struct {
     int priority;
-    profile_state_t state;
+    virtual_ip_state_t state;
     char runtime_uuid[40];
 } node_msg_t;
 
@@ -68,21 +68,21 @@ static cpg_callbacks_t callbacks = {
     .cpg_confchg_fn = ConfchgCallback,
 };
 
-void launch_rollback_thread(profile_t *profile);
-void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj);
+void launch_rollback_thread(virtual_ip_t *vip);
+void *SWITCH_THREAD_FUNC vip_thread_run(switch_thread_t *thread, void *obj);
 void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
 static int send_message(cpg_handle_t h, void *buf, int len);
 
-profile_t *find_profile_by_name(char *profile_name)
+virtual_ip_t *find_virtual_ip(char *address)
 {
     // controllo che non sia null
-    profile_t *profile = NULL;
-    profile = (profile_t *)switch_core_hash_find(globals.profile_hash,profile_name);
-    return profile;
+    virtual_ip_t *vip = NULL;
+    vip = (virtual_ip_t *)switch_core_hash_find(globals.virtual_ip_hash,address);
+    return vip;
 }
 
 
-void launch_rollback_thread(profile_t *profile)
+void launch_rollback_thread(virtual_ip_t *vip)
 {
     switch_thread_t *thread;
     switch_threadattr_t *thd_attr = NULL;
@@ -92,92 +92,92 @@ void launch_rollback_thread(profile_t *profile)
     switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
     switch_threadattr_priority_increase(thd_attr);
     switch_thread_create(&thread, thd_attr, rollback_thread_run,
-                                                         profile, globals.pool);
+                                                         vip, globals.pool);
 }
 void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj)
 {
-    profile_t *profile = (profile_t *) obj;
+    virtual_ip_t *vip = (virtual_ip_t *) obj;
     int result;
     uint32_t local_id;
     switch_status_t status;
 
 
-    local_id = profile->rollback_node_id;
+    local_id = vip->rollback_node_id;
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                             "Rollback thread for %s started, waiting for %s!\n",
-                                profile->name, utils_node_pid_format(local_id));
+                                vip->address, utils_node_pid_format(local_id));
 
-    for (int i = 0;i < profile->rollback_delay * 60; i++) {
+    for (int i = 0;i < vip->rollback_delay * 60; i++) {
         switch_yield(1000000);
-        if ( profile->rollback_node_id != local_id) {
+        if ( vip->rollback_node_id != local_id) {
              switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                              "Rollback node for %s changed!\n", profile->name);
-             profile->rollback_node_id = 0;
+                              "Rollback node for %s changed!\n", vip->address);
+             vip->rollback_node_id = 0;
              return NULL;
         }
 
-        if (utils_count_profile_channels(profile->name) == 0) {
+        if (utils_count_profile_channels(vip->address) == 0) {
              switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                   "0 calls for %s!Rollback!\n", profile->name);
+                                   "0 calls for %s!Rollback!\n", vip->address);
 
              break;
         }
 
     }
-    profile->rollback_node_id = 0;
-    profile->running = 0;
-    switch_thread_join(&status, profile->profile_thread);
+    vip->rollback_node_id = 0;
+    vip->running = 0;
+    switch_thread_join(&status, vip->virtual_ip_thread);
 
-    from_master_to_standby(profile);
+    from_master_to_standby(vip);
 
-    result = cpg_leave(profile->handle, &profile->group_name);
+    result = cpg_leave(vip->handle, &vip->group_name);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                  "Leave  result is %d (should be 1)\n", result);
     switch_yield(10000);
-    result = cpg_finalize (profile->handle);
+    result = cpg_finalize (vip->handle);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                               "Finalize  result is %d (should be 1)\n", result);
     switch_yield(5000000);
-    profile_start(profile);
+    virtual_ip_start(vip);
     return NULL;
 }
 
-switch_status_t profile_start(profile_t *profile)
+switch_status_t virtual_ip_start(virtual_ip_t *vip)
 {
     switch_threadattr_t *thd_attr = NULL;
     switch_threadattr_create(&thd_attr, globals.pool);
     switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
     switch_threadattr_priority_increase(thd_attr);
-    switch_thread_create(&(profile->profile_thread), thd_attr,
-                                     profile_thread_run, profile, globals.pool);
+    switch_thread_create(&(vip->virtual_ip_thread), thd_attr,
+                                     vip_thread_run, vip, globals.pool);
     //TODO cerca i possibili errori
     return SWITCH_STATUS_SUCCESS;
 }
 
-switch_status_t profile_stop(profile_t *profile)
+switch_status_t virtual_ip_stop(virtual_ip_t *vip)
 {
-    return go_to_standby(profile);
+    return go_to_standby(vip);
 }
 
-void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj)
+void *SWITCH_THREAD_FUNC vip_thread_run(switch_thread_t *thread, void *obj)
 {
-    profile_t *profile = (profile_t *) obj;
+    virtual_ip_t *vip = (virtual_ip_t *) obj;
     fd_set read_fds;
     int select_fd;
     int result;
 
-    profile->members_number = 0;
+    vip->members_number = 0;
 
-    if (from_standby_to_init(profile) != SWITCH_STATUS_SUCCESS) {
+    if (from_standby_to_init(vip) != SWITCH_STATUS_SUCCESS) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-          "Cannot launch %s, verify virtual ip and arptables\n", profile->name);
+          "Cannot launch %s, verify virtual ip and arptables\n", vip->address);
         return NULL;
     }
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"%s launch\n",
-                                                                 profile->name);
+                                                                 vip->address);
 
-    result = cpg_initialize (&profile->handle, &callbacks);
+    result = cpg_initialize (&vip->handle, &callbacks);
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
            "Could not initialize Cluster Process Group API instance error %d\n",
@@ -185,31 +185,31 @@ void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj)
         return NULL;
     }
 
-    result = cpg_context_set (profile->handle,profile);
+    result = cpg_context_set (vip->handle,vip);
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                                               "Could not set handle context\n");
         return NULL;
     }
 
-    cpg_fd_get(profile->handle, &select_fd);
+    cpg_fd_get(vip->handle, &select_fd);
 
-    result = cpg_local_get (profile->handle, &(profile->node_id));
+    result = cpg_local_get (vip->handle, &(vip->node_id));
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Could not get local node id\n");
         return NULL;
     }
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Local node id is %x\n", profile->node_id);
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Local node id is %x\n", vip->node_id);
 
-    result = cpg_join(profile->handle, &profile->group_name);
+    result = cpg_join(vip->handle, &vip->group_name);
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Could not join process group, error %d\n", result);
         return NULL;
     }
 
-    profile->running = 1;
+    vip->running = 1;
 
-    while((profile->running) && (globals.running)) {
+    while((vip->running) && (globals.running)) {
         struct timeval timeout = { 1, 0 };
 
         FD_ZERO (&read_fds);
@@ -220,17 +220,17 @@ void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj)
         }
 
         if (FD_ISSET (select_fd, &read_fds)) {
-            if (cpg_dispatch (profile->handle, CS_DISPATCH_ALL) != CS_OK)
+            if (cpg_dispatch (vip->handle, CS_DISPATCH_ALL) != CS_OK)
                 return NULL;
         }
 
     }
     //end
-    node_remove_all(profile->node_list);
-    if (profile->node_list) {
-        profile->node_list = NULL;
+    node_remove_all(vip->node_list);
+    if (vip->node_list) {
+        vip->node_list = NULL;
     }
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"%s profile thread stopped\n",profile->name);
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"%s virtual_ip thread stopped\n",vip->address);
     return NULL;
 
 
@@ -245,21 +245,21 @@ static void DeliverCallback (
     size_t msg_len)
 {
     header_t *hd;
-    profile_t *profile;
+    virtual_ip_t *vip;
     void *context;
 
     hd = msg;
 
     cpg_context_get (handle, &context);
-    profile = (profile_t *) context;
+    vip = (virtual_ip_t *) context;
 
     switch (hd->type) {
 
     case SQL:
-        if (profile->node_id != nodeid) {
+        if (vip->node_id != nodeid) {
             char *sql;
             sql = (char *)msg + sizeof(header_t);
-            utils_send_track_event(sql, profile->name);
+            utils_send_track_event(sql, vip->address);
 
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"received sql from other node\n");
 
@@ -274,53 +274,53 @@ static void DeliverCallback (
 
         nm = (node_msg_t *)(((char *)msg ) + sizeof(header_t));
 
-        profile->node_list = node_add(profile->node_list, nodeid, nm->priority);
+        vip->node_list = node_add(vip->node_list, nodeid, nm->priority);
 
         if (nm->state == MASTER) {
-            profile->master_id = nodeid;
-            switch_snprintf(profile->runtime_uuid, sizeof(profile->runtime_uuid),"%s", nm->runtime_uuid );
+            vip->master_id = nodeid;
+            switch_snprintf(vip->runtime_uuid, sizeof(vip->runtime_uuid),"%s", nm->runtime_uuid );
         }
 
-        switch (profile->state) {
+        switch (vip->state) {
 
             case INIT:
-                if ((nm->priority == profile->priority) && (nodeid != profile->node_id)) {
+                if ((nm->priority == vip->priority) && (nodeid != vip->node_id)) {
                     int result;
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                            "Node with the same priority detected!Please change it!\n");
-                    from_init_to_standby(profile);
-                    result = cpg_leave(profile->handle, &profile->group_name);
+                    from_init_to_standby(vip);
+                    result = cpg_leave(vip->handle, &vip->group_name);
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                         "Leave  result is %d (should be 1)\n", result);
                     switch_yield(10000);
-                    result = cpg_finalize (profile->handle);
+                    result = cpg_finalize (vip->handle);
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                      "Finalize  result is %d (should be 1)\n", result);
                     break;
                 }
 
                 // if the priority list is complete becomes BACKUP
-                if (list_entries(profile->node_list) == profile->member_list_entries) {
-                    from_init_to_backup(profile);
+                if (list_entries(vip->node_list) == vip->member_list_entries) {
+                    from_init_to_backup(vip);
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "I'm a BACKUP!\n");
                 }
                 break;
             case BACKUP:
                 break;
             case MASTER:
-                if (profile->node_list != NULL ) {
-                    if ((profile->autorollback == SWITCH_TRUE) &&
-                        (profile->node_list->nodeid != profile->node_id) &&
-                        (profile->node_list->nodeid != profile->rollback_node_id)) {
+                if (vip->node_list != NULL ) {
+                    if ((vip->autorollback == SWITCH_TRUE) &&
+                        (vip->node_list->nodeid != vip->node_id) &&
+                        (vip->node_list->nodeid != vip->rollback_node_id)) {
 
-                        profile->rollback_node_id = profile->node_list->nodeid;
+                        vip->rollback_node_id = vip->node_list->nodeid;
 
                         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
                                               "ROLLBACK node %u(!=%u) found!\n",
-                                                     profile->node_list->nodeid,
-                                                              profile->node_id);
+                                                     vip->node_list->nodeid,
+                                                              vip->node_id);
 
-                        launch_rollback_thread(profile);
+                        launch_rollback_thread(vip);
                         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
                                                    "ROLLBACK timer started!\n");
                     }
@@ -347,7 +347,7 @@ static void ConfchgCallback (
     const struct cpg_address *joined_list, size_t joined_list_entries)
 {
     int i, result;
-    profile_t *profile;
+    virtual_ip_t *vip;
     void *context;
 
     result = cpg_context_get (handle, &context);
@@ -356,9 +356,9 @@ static void ConfchgCallback (
         return;
     }
 
-    profile = (profile_t *) context;
+    vip = (virtual_ip_t *) context;
 
-    profile->member_list_entries = member_list_entries;
+    vip->member_list_entries = member_list_entries;
 
     // left
     if (left_list_entries > 0) {
@@ -367,14 +367,14 @@ static void ConfchgCallback (
         // remove nodes gone down
 
         for (i = 0; i < left_list_entries; i++) {
-            if ( left_list[i].nodeid == profile->master_id) {
+            if ( left_list[i].nodeid == vip->master_id) {
                 master_flag = SWITCH_TRUE;
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"Master down!\n");
             }
-            profile->node_list = node_remove(profile->node_list, left_list[i].nodeid);
+            vip->node_list = node_remove(vip->node_list, left_list[i].nodeid);
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"i = %d, nodeid = %u\n",i,left_list[i].nodeid);
         }
-        switch (profile->state) {
+        switch (vip->state) {
 
             case INIT:
                 //
@@ -384,19 +384,20 @@ static void ConfchgCallback (
                 if (master_flag == SWITCH_TRUE) {
                     //
                     // if I'm the first in priority list
-                    if ( profile->node_list->nodeid == profile->node_id) {
+                    if ( vip->node_list->nodeid == vip->node_id) {
                         // become master
-                        from_backup_to_master(profile);
+                        from_backup_to_master(vip);
                         // and I say it to all other nodes
-                        profile_send_state(profile);
+                        virtual_ip_send_state(vip);
                     } else {
                         // clean up the table
                         char *sql;
+                        //FIXME sistemare la delete con il nome del profilo!
                         sql = switch_mprintf("delete from sip_recovery where "
                                      "runtime_uuid='%q' and profile_name='%q'",
-                                          profile->runtime_uuid, profile->name);
+                                          vip->runtime_uuid, vip->address);
 
-                        utils_send_track_event(sql, profile->name);
+                        utils_send_track_event(sql, vip->address);
                         switch_safe_free(sql);
                     }
                 }
@@ -412,15 +413,15 @@ static void ConfchgCallback (
     if (joined_list_entries > 0) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "JOIN!\n");
         // if someone has joined I send him my infos
-        profile_send_state(profile);
+        virtual_ip_send_state(vip);
 
-        switch (profile->state) {
+        switch (vip->state) {
             case INIT:
                 // if I'm alone
                 if (member_list_entries == 1) {
                     // I'm the master
-                    from_init_to_master(profile);
-                    profile_send_state(profile);
+                    from_init_to_master(vip);
+                    virtual_ip_send_state(vip);
                 }
                 // else I have to fill priority table
                 break;
@@ -436,7 +437,7 @@ static void ConfchgCallback (
 }
 
 
-switch_status_t profile_send_sql(profile_t *profile, char *sql)
+switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql)
 {
     header_t *hd;
     char *buf;
@@ -454,13 +455,13 @@ switch_status_t profile_send_sql(profile_t *profile, char *sql)
 
     memcpy(buf+sizeof(header_t), sql, strlen(sql) + 1);
 
-    send_message(profile->handle,buf,len);
+    send_message(vip->handle,buf,len);
 
     free(buf);
 
     return SWITCH_STATUS_SUCCESS;
 }
-switch_status_t profile_send_state(profile_t *profile)
+switch_status_t virtual_ip_send_state(virtual_ip_t *vip)
 {
     header_t *hd;
     node_msg_t *nm;
@@ -479,11 +480,11 @@ switch_status_t profile_send_state(profile_t *profile)
     hd->len = 10;
 
     nm = ( node_msg_t *)(buf + sizeof(header_t));
-    nm->state = profile->state;
-    nm->priority = profile->priority;
+    nm->state = vip->state;
+    nm->priority = vip->priority;
     switch_snprintf(nm->runtime_uuid,sizeof(nm->runtime_uuid),"%s",switch_core_get_uuid());
 
-    send_message(profile->handle,buf,len);
+    send_message(vip->handle,buf,len);
 
     free(buf);
 

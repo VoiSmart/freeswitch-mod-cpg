@@ -26,7 +26,7 @@
 #include "cpg_config.h"
 
 #include "cpg_utils.h"
-#include "cpg_profile.h"
+#include "cpg_virtual_ip.h"
 
 /*
     TODO riceve filename e puntatore all'area di memoria da riempire
@@ -34,8 +34,8 @@
 */
 switch_status_t do_config(char *cf)
 {
-    switch_xml_t cfg, xml, xprofile, param;
-    profile_t *profile;
+    switch_xml_t cfg, xml, xvip, param;
+    virtual_ip_t *vip;
 
     switch_status_t status = SWITCH_STATUS_SUCCESS;
 
@@ -49,40 +49,39 @@ switch_status_t do_config(char *cf)
                                                            "%s opened\n", cf);
 
 
-    for (xprofile= switch_xml_child(cfg,"virtual_ip");
-                                  xprofile; xprofile = xprofile->next) {
+    for (xvip= switch_xml_child(cfg,"virtual_ip");
+                                  xvip; xvip = xvip->next) {
 
-        char *virtual_ip = NULL;
+        char *address = NULL;
         char *netmask = NULL;
 
-        if (!(profile = (profile_t *) switch_core_alloc(globals.pool, sizeof(profile_t)))) {
+        if (!(vip = (virtual_ip_t *) switch_core_alloc(globals.pool, sizeof(virtual_ip_t)))) {
             switch_log_printf(SWITCH_CHANNEL_LOG,
                                          SWITCH_LOG_ERROR, "Memory Error!\n");
             return SWITCH_STATUS_FALSE;
         }
 
-        virtual_ip = (char *) switch_xml_attr_soft(xprofile, "virtual_ip");
-        netmask = (char *) switch_xml_attr_soft(xprofile, "cidr_netmask");
+        address = (char *) switch_xml_attr_soft(xvip, "virtual_ip");
+        netmask = (char *) switch_xml_attr_soft(xvip, "cidr_netmask");
 
-        if (utils_ip_is_valid(virtual_ip) != SWITCH_TRUE) {
+        if (utils_ip_is_valid(address) != SWITCH_TRUE) {
             //TODO devo liberare la memoria?
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                                      "virtual_ip %s is not valid\n", virtual_ip);
+                                      "virtual_ip %s is not valid\n", address);
             continue;
         }
-        switch_snprintf(profile->virtual_ip,16,"%s",virtual_ip);
-        switch_snprintf(profile->name,255,"%s",virtual_ip);
-        profile->netmask = utils_get_netmask(netmask);
+        switch_snprintf(vip->address,16,"%s",address);
+        vip->netmask = utils_get_netmask(netmask);
 
-        switch_snprintf(profile->group_name.value,255,"%s",virtual_ip);
-        profile->group_name.length = strlen(virtual_ip);
+        switch_snprintf(vip->group_name.value,255,"%s",address);
+        vip->group_name.length = strlen(address);
 
 
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-               "new virtual_ip %s/%d\n", profile->virtual_ip, profile->netmask);
+               "new virtual_ip %s/%d\n", vip->address, vip->netmask);
 
 
-        for (param = switch_xml_child(xprofile, "param"); 
+        for (param = switch_xml_child(xvip, "param"); 
                                                  param; param = param->next) {
             char *var = (char *) switch_xml_attr_soft(param, "name");
             char *val = (char *) switch_xml_attr_soft(param, "value");
@@ -90,56 +89,56 @@ switch_status_t do_config(char *cf)
 
             if (!strcmp(var, "device")) {
                 char *mac;
-                switch_snprintf(profile->device,6,"%s",val);
+                switch_snprintf(vip->device,6,"%s",val);
                 //get local mac virtual_ip
-                mac = utils_get_mac_addr(profile->device);
+                mac = utils_get_mac_addr(vip->device);
 
-                if (profile->device == NULL || mac == NULL) {
+                if (vip->device == NULL || mac == NULL) {
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                                      "virtual_ip %s: Interface is not valid\n",
-                                                          profile->virtual_ip);
+                                                          vip->address);
                     status = SWITCH_STATUS_FALSE;
                     goto out;
                 }
-                switch_snprintf(profile->mac,18,"%s",mac);
+                switch_snprintf(vip->mac,18,"%s",mac);
 
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
                                           "device = %s with mac = %s\n",
-                                           profile->device, profile->mac);
+                                           vip->device, vip->mac);
 
             } else if (!strcmp(var, "autoload")) {
-                profile->autoload = SWITCH_FALSE;
+                vip->autoload = SWITCH_FALSE;
                 if (!strcmp(val, "true")) {
-                    profile->autoload = SWITCH_TRUE;
+                    vip->autoload = SWITCH_TRUE;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                        "Autoload = %s\n", profile->autoload == SWITCH_TRUE?
+                        "Autoload = %s\n", vip->autoload == SWITCH_TRUE?
                                                              "true":"false" );
 
             } else if (!strcmp(var, "autorollback")) {
-                profile->autorollback = SWITCH_FALSE;
+                vip->autorollback = SWITCH_FALSE;
                 if (!strcmp(val, "true")) {
-                    profile->autorollback = SWITCH_TRUE;
+                    vip->autorollback = SWITCH_TRUE;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                "Autorollback = %s\n", profile->autorollback == SWITCH_TRUE?
+                "Autorollback = %s\n", vip->autorollback == SWITCH_TRUE?
                                                              "true":"false" );
             } else if (!strcmp(var, "rollback-delay")) {
-                profile->rollback_delay = atoi(val);
-                if ( profile->rollback_delay == 0) {
-                    profile->rollback_delay = 1;
+                vip->rollback_delay = atoi(val);
+                if ( vip->rollback_delay == 0) {
+                    vip->rollback_delay = 1;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                          "Rollback delay = %d\n", profile->rollback_delay);
+                          "Rollback delay = %d\n", vip->rollback_delay);
             } else if (!strcmp(var, "priority")) {
-                profile->priority = atoi(val);
+                vip->priority = atoi(val);
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                                      "Priority = %d\n", profile->priority);
+                                      "Priority = %d\n", vip->priority);
             }
 
         }
 
-        status = switch_core_hash_insert(globals.profile_hash, profile->virtual_ip, profile);
+        status = switch_core_hash_insert(globals.virtual_ip_hash, vip->address, vip);
         if (status != SWITCH_STATUS_SUCCESS) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, 
                                       "Cannot insert virtual_ip data in hash");
@@ -147,24 +146,24 @@ switch_status_t do_config(char *cf)
         }
     }
 
-/*    for (xprofile= switch_xml_child(cfg,"profile");*/
-/*                                        xprofile; xprofile = xvirtual_ip->next) {*/
+/*    for (xvip= switch_xml_child(cfg,"profile");*/
+/*                                        xvip; xvip = xvirtual_ip->next) {*/
 
 /*        char *name = NULL;*/
 /*        char *virtual_ip = NULL;*/
 
-/*        if (!(profile = (virtual_ip_t *) switch_core_alloc(globals.pool, sizeof(virtual_ip_t)))) {*/
+/*        if (!(vip = (virtual_ip_t *) switch_core_alloc(globals.pool, sizeof(virtual_ip_t)))) {*/
 /*            switch_log_printf(SWITCH_CHANNEL_LOG,*/
 /*                                         SWITCH_LOG_ERROR, "Memory Error!\n");*/
 /*            return SWITCH_STATUS_FALSE;*/
 /*        }*/
 
-/*        name = (char *) switch_xml_attr_soft(xprofile, "name");*/
-/*        virtual_ip = (char *) switch_xml_attr_soft(xprofile, "virtual_ip");*/
+/*        name = (char *) switch_xml_attr_soft(xvip, "name");*/
+/*        virtual_ip = (char *) switch_xml_attr_soft(xvip, "virtual_ip");*/
 
 /*//TODO esiste il profilo? esiste l'indirizzo'?*/
 
-/*        for (param = switch_xml_child(xprofile, "param"); param; param = param->next) {*/
+/*        for (param = switch_xml_child(xvip, "param"); param; param = param->next) {*/
 /*            char *var = (char *) switch_xml_attr_soft(param, "name");*/
 /*            char *val = (char *) switch_xml_attr_soft(param, "value");*/
 
