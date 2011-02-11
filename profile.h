@@ -38,7 +38,22 @@ typedef enum{
     STANDBY
 } profile_state_t;///serve davvero?
 
+typedef struct {
+    int priority;
+    profile_state_t state;
+    char runtime_uuid[40];
+} node_msg_t;
 
+typedef enum {
+    SQL,
+    NODE_STATE
+} msg_type_t;
+
+struct header {
+    msg_type_t type;
+    int len;
+};
+typedef struct header header_t;
 
 typedef struct {
     char name[255];
@@ -77,4 +92,9 @@ switch_status_t from_init_to_standby(profile_t *profile);
 
 switch_status_t go_to_standby(profile_t *profile);
 
+
+
+void launch_profile_thread(profile_t *profile);
+switch_status_t send_sql(cpg_handle_t h, char *sql);
+switch_status_t send_state(cpg_handle_t h, profile_t *profile);
 #endif
