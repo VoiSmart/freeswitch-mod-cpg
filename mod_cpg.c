@@ -26,6 +26,7 @@
 
 #include "profile.h"
 #include "cpg_utils.h"
+#include "cpg_config.h"
 
 typedef struct {
     int priority;
@@ -85,128 +86,6 @@ static cpg_callbacks_t callbacks = {
     .cpg_deliver_fn = DeliverCallback,
     .cpg_confchg_fn = ConfchgCallback,
 };
-
-static switch_status_t do_config()
-{
-    char *cf = "cpg.conf";
-    switch_xml_t cfg, xml, xprofile,param,settings;
-    profile_t *profile;
-
-    switch_status_t status = SWITCH_STATUS_SUCCESS;
-
-    if (!(xml = switch_xml_open_cfg(cf, &cfg, NULL))) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Open of %s failed\n", cf);
-        return SWITCH_STATUS_TERM;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "%s opened\n", cf);
-
-    if ((settings = switch_xml_child(cfg, "global_settings"))) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "global settings\n");
-        for (param = switch_xml_child(settings, "param"); param; param = param->next) {
-                char *var = (char *) switch_xml_attr_soft(param, "name");
-                char *val = (char *) switch_xml_attr_soft(param, "value");
-                if (!strcmp(var, "group")) {
-                    switch_snprintf(globals.group_name.value,255,"%s",val);
-                    globals.group_name.length = strlen(val);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "group = %s\n", globals.group_name.value);
-                }
-            }
-
-
-        for (xprofile= switch_xml_child(settings,"profile"); xprofile; xprofile = xprofile->next) {
-
-            char *name;
-            if (!(profile = (profile_t *) switch_core_alloc(globals.pool, sizeof(profile_t)))) {
-                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Memory Error!\n");
-                return SWITCH_STATUS_FALSE;
-            }
-            profile->state = STANDBY;
-            name = (char *) switch_xml_attr_soft(xprofile, "name");
-            switch_snprintf(profile->name,255,"%s",name);
-            switch_snprintf(profile->group_name.value,255,"%s",name);
-            profile->group_name.length = strlen(name);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "new profile %s\n",profile->name);
-
-            for (param = switch_xml_child(xprofile, "param"); param; param = param->next) {
-                char *var = (char *) switch_xml_attr_soft(param, "name");
-                char *val = (char *) switch_xml_attr_soft(param, "value");
-
-                if (!strcmp(var, "virtual-ip")) {
-                    unsigned char buf[sizeof(struct in6_addr)];
-                    int s = inet_pton(AF_INET, val, buf);
-                    if (s <= 0) {
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                            "Profile %s: Virtual ip is not valid\n", profile->name);
-                        status = SWITCH_STATUS_FALSE;
-                        goto out;
-                    }
-                    switch_snprintf(profile->virtual_ip,16,"%s",val);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                                             "vip = %s\n", profile->virtual_ip);
-
-                } else if (!strcmp(var, "device")) {
-                    char *mac;
-                    switch_snprintf(profile->device,6,"%s",val);
-                    //get local mac address
-                    mac = utils_get_mac_addr(profile->device);
-
-                    if (profile->device == NULL || mac == NULL) {
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                            "Profile %s: Interface is not valid\n", profile->name);
-                        status = SWITCH_STATUS_FALSE;
-                        goto out;
-                    }
-                    strcpy(profile->mac,mac);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                                              "device = %s\n", profile->device);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                                                    "mac = %s\n", profile->mac);
-
-                } else if (!strcmp(var, "autoload")) {
-                    profile->autoload = SWITCH_FALSE;
-                    if (!strcmp(val, "true")) {
-                        profile->autoload = SWITCH_TRUE;
-                    }
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Autoload = %s\n",
-                                      profile->autoload == SWITCH_TRUE?"true":"false" );
-                } else if (!strcmp(var, "autorecover")) {
-                    profile->autorecover = SWITCH_FALSE;
-                    if (!strcmp(val, "true")) {
-                        profile->autorecover = SWITCH_TRUE;
-                    }
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Autorecover = %s\n",
-                                      profile->autorecover == SWITCH_TRUE?"true":"false" );
-                } else if (!strcmp(var, "autorollback")) {
-                    profile->autorollback = SWITCH_FALSE;
-                    if (!strcmp(val, "true")) {
-                        profile->autorollback = SWITCH_TRUE;
-                    }
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Autorollback = %s\n",
-                                      profile->autorollback == SWITCH_TRUE?"true":"false" );
-                } else if (!strcmp(var, "rollback-delay")) {
-                    profile->rollback_delay = atoi(val);
-                    if ( profile->rollback_delay == 0) {
-                        profile->rollback_delay = 1;
-                    }
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Rollback delay = %d\n",
-                                      profile->rollback_delay);
-                } else if (!strcmp(var, "priority")) {
-                    profile->priority = atoi(val);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Priority = %d\n", profile->priority);
-                }
-            }
-            status = switch_core_hash_insert(globals.profile_hash, profile->name, profile);
-            if (utils_profile_control(profile->name) != SWITCH_STATUS_SUCCESS) {
-                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "profile %s doesn't exist in sip_profiles directory, before to do anything create it and reloadxml!\n", profile->name);
-            }
-        }
-    }
-out:
-    switch_xml_free(xml);
-
-    return status;
-}
 
 void launch_rollback_thread(profile_t *profile)
 {
@@ -869,7 +748,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 
     switch_core_hash_init(&globals.profile_hash, globals.pool);
 
-    if (do_config() != SWITCH_STATUS_SUCCESS) {
+    if (do_config("cpg.conf") != SWITCH_STATUS_SUCCESS) {
         return SWITCH_STATUS_TERM;
     }
 
