@@ -43,6 +43,7 @@ typedef enum{
 typedef struct {
     char name[255];
     char virtual_ip[16];
+    int netmask;
     profile_state_t state;
     char device[10];
     char mac[18];
