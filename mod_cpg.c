@@ -112,7 +112,7 @@ switch_status_t start_profiles()
         if (profile->autoload == SWITCH_TRUE) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                                   "launch %s\n", profile->name);
-            launch_profile_thread(profile);
+            profile_start(profile);
         }
     }
     return SWITCH_STATUS_SUCCESS;
@@ -137,7 +137,7 @@ switch_status_t stop_profiles()
             profile->running = 0;
             switch_thread_join(&status, profile->profile_thread);
 
-            go_to_standby(profile);
+            profile_stop(profile);
 
             result = cpg_leave(profile->handle, &profile->group_name);
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
@@ -187,7 +187,7 @@ switch_status_t stop_profiles_with_ip(char *profile_ip)
             profile->running = 0;
             switch_thread_join(&status, profile->profile_thread);
 
-            go_to_standby(profile);
+            profile_stop(profile);
 
             result = cpg_leave(profile->handle, &profile->group_name);
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
@@ -219,7 +219,9 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
         if (profile != NULL) {
             if (!profile->running) {
 
-                launch_profile_thread(profile);
+                profile_start(profile);
+                //FIXME okkio che non voglio esporre sti flag.. 
+                //TODO cmq dovrei separare quelli di runtime da quelli di conf
                 profile->autoload = SWITCH_TRUE;
                 /*se lo accendo metto l'autoload così riparte se c'è una riconnessione*/
                 stream->write_function(stream, "starting %s\n", argv[0]);
@@ -418,7 +420,7 @@ switch_status_t profiles_state_notification()
         profile = (profile_t *) val;
         if (profile->running) {
 
-            send_state(profile->handle, profile);
+            profile_send_state(profile->handle, profile);
 
         }
     }
@@ -437,7 +439,7 @@ void event_handler(switch_event_t *event)
 
         if ((profile = find_profile_by_name(profile_name))) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",profile->name);
-            send_sql(profile->handle,sql);
+            profile_send_sql(profile->handle,sql);
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
         }

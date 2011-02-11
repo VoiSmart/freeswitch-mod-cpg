@@ -27,9 +27,24 @@
 
 #include <switch.h>
 #include "cpg_utils.h"
+#include "cpg_actions.h"
 
+typedef struct {
+    int priority;
+    profile_state_t state;
+    char runtime_uuid[40];
+} node_msg_t;
 
+typedef enum {
+    SQL,
+    NODE_STATE
+} msg_type_t;
 
+struct header {
+    msg_type_t type;
+    int len;
+};
+typedef struct header header_t;
 
 static void DeliverCallback (
     cpg_handle_t handle,
@@ -53,7 +68,7 @@ static cpg_callbacks_t callbacks = {
     .cpg_confchg_fn = ConfchgCallback,
 };
 
-
+void launch_rollback_thread(profile_t *profile);
 void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj);
 void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
 static int send_message(cpg_handle_t h, void *buf, int len);
@@ -65,176 +80,6 @@ profile_t *find_profile_by_name(char *profile_name)
     profile = (profile_t *)switch_core_hash_find(globals.profile_hash,profile_name);
     return profile;
 }
-
-
-switch_status_t from_standby_to_init(profile_t *profile)
-{
-    profile->state = INIT;
-
-    // start sofia profile
-    for (int i=0; i<3; i++) {
-        switch_yield(100000);
-        if (utils_start_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS) {
-            goto error;
-        }
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From STANDBY to INIT for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to INIT!\n");
-    profile->state = STANDBY;
-    return SWITCH_STATUS_FALSE;
-
-}
-
-switch_status_t from_init_to_backup(profile_t *profile)
-{
-    profile->state = BACKUP;
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to BACKUP for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-}
-
-switch_status_t from_init_to_master(profile_t *profile)
-{
-    profile->state = MASTER;
-
-    // set the ip to bind to
-    if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-        goto error;
-    }
-
-    // gratuitous arp request
-    if (utils_send_gARP(profile->mac, profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-        utils_remove_vip(profile->virtual_ip, profile->device);
-        goto error;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to MASTER for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
-    profile->state = STANDBY;
-    return SWITCH_STATUS_FALSE;
-}
-
-switch_status_t from_backup_to_master(profile_t *profile)
-{
-    profile->state = MASTER;
-
-    // set the ip to bind to
-    if (utils_add_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-        goto error;
-    }
-
-    // gratuitous arp request
-    if (utils_send_gARP(profile->mac, profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-        utils_remove_vip(profile->virtual_ip, profile->device);
-        goto error;
-    }
-
-    // sofia recover!!!
-    if (profile->autorecover == SWITCH_TRUE) {
-        utils_recover(profile->name);
-    }
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to MASTER for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
-    profile->state = STANDBY;
-    return SWITCH_STATUS_FALSE;
-}
-
-switch_status_t from_master_to_standby(profile_t *profile)
-{
-    profile->state = STANDBY;
-    profile->master_id = 0;
-    profile->member_list_entries = 0;
-    if (utils_remove_vip(profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
-        goto error;
-    }
-
-    // stop sofia profile
-    if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-        goto error;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From MASTER to STANDBY for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
-    return SWITCH_STATUS_FALSE;
-}
-
-switch_status_t from_backup_to_standby(profile_t *profile)
-{
-    profile->state = STANDBY;
-    profile->master_id = 0;
-    profile->member_list_entries = 0;
-
-    // stop sofia profile
-    if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-        goto error;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to STANDBY for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
-    return SWITCH_STATUS_FALSE;
-}
-
-switch_status_t from_init_to_standby(profile_t *profile)
-{
-    profile->state = STANDBY;
-    profile->master_id = 0;
-    profile->member_list_entries = 0;
-
-    // stop sofia profile
-    if (utils_stop_sofia_profile(profile->name) != SWITCH_STATUS_SUCCESS){
-        goto error;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to STANDBY for %s!\n", profile->name);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
-    return SWITCH_STATUS_FALSE;
-}
-
-switch_status_t go_to_standby(profile_t *profile)
-{
-    switch_status_t status = SWITCH_STATUS_FALSE;
-
-    if (!profile)
-        return status;
-
-    switch(profile->state) {
-        case MASTER:
-            status = from_master_to_standby(profile);
-            break;
-        case BACKUP:
-            status = from_backup_to_standby(profile);
-            break;
-        case INIT:
-            status = from_init_to_standby(profile);
-            break;
-        case STANDBY:
-            status = SWITCH_STATUS_SUCCESS;
-            break;
-    }
-    return status;
-}
-
-
-
-
 
 
 void launch_rollback_thread(profile_t *profile)
@@ -293,11 +138,11 @@ void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj)
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                               "Finalize  result is %d (should be 1)\n", result);
     switch_yield(5000000);
-    launch_profile_thread(profile);
+    profile_start(profile);
     return NULL;
 }
 
-void launch_profile_thread(profile_t *profile)
+switch_status_t profile_start(profile_t *profile)
 {
     switch_threadattr_t *thd_attr = NULL;
     switch_threadattr_create(&thd_attr, globals.pool);
@@ -305,6 +150,13 @@ void launch_profile_thread(profile_t *profile)
     switch_threadattr_priority_increase(thd_attr);
     switch_thread_create(&(profile->profile_thread), thd_attr,
                                      profile_thread_run, profile, globals.pool);
+    //TODO cerca i possibili errori
+    return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t profile_stop(profile_t *profile)
+{
+    return go_to_standby(profile);
 }
 
 void *SWITCH_THREAD_FUNC profile_thread_run(switch_thread_t *thread, void *obj)
@@ -536,7 +388,7 @@ static void ConfchgCallback (
                         // become master
                         from_backup_to_master(profile);
                         // and I say it to all other nodes
-                        send_state(handle, profile);
+                        profile_send_state(handle, profile);
                     } else {
                         // clean up the table
                         char *sql;
@@ -560,7 +412,7 @@ static void ConfchgCallback (
     if (joined_list_entries > 0) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "JOIN!\n");
         // if someone has joined I send him my infos
-        send_state(handle,profile);
+        profile_send_state(handle,profile);
 
         switch (profile->state) {
             case INIT:
@@ -568,7 +420,7 @@ static void ConfchgCallback (
                 if (member_list_entries == 1) {
                     // I'm the master
                     from_init_to_master(profile);
-                    send_state(handle, profile);
+                    profile_send_state(handle, profile);
                 }
                 // else I have to fill priority table
                 break;
@@ -584,7 +436,7 @@ static void ConfchgCallback (
 }
 
 
-switch_status_t send_sql(cpg_handle_t h, char *sql)
+switch_status_t profile_send_sql(cpg_handle_t h, char *sql)
 {
     header_t *hd;
     char *buf;
@@ -608,7 +460,7 @@ switch_status_t send_sql(cpg_handle_t h, char *sql)
 
     return SWITCH_STATUS_SUCCESS;
 }
-switch_status_t send_state(cpg_handle_t h, profile_t *profile)
+switch_status_t profile_send_state(cpg_handle_t h, profile_t *profile)
 {
     header_t *hd;
     node_msg_t *nm;
