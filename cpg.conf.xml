@@ -11,17 +11,9 @@
         <param name="autorollback" value="true"/>
         <!-- minutes to wait before rollbacking -->
         <param name="rollback-delay" value="1"/>
+        <profile name="internal" autorecover="true"/>
+        <profile name="external" autorecover="true"/>
     </virtualip>
-
-    <profile name="internal" virtualip="192.168.1.51">
-        <!-- enable profile calls recover -->
-        <param name="autorecover" value="true"/>
-    </profile>
-
-    <profile name="external" virtualip="192.168.1.51">
-        <!-- enable profile calls recover -->
-        <param name="autorecover" value="true"/>
-    </profile>
 
 </configuration>
 
