@@ -496,7 +496,7 @@ int utils_get_netmask(char *netmask) {
 
 }
 
-switch_status_t send_gARP(char *mac, char *address, char *device) {
+switch_status_t utils_send_gARP(char *mac, char *address, char *device) {
     int ret = net_send_arp_string(mac, "ff:ff:ff:ff:ff:ff", 1,
                                   mac,address,mac, address, device);
     if (ret == 0)
