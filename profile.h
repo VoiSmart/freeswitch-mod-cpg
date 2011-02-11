@@ -29,6 +29,8 @@
 #include <corosync/cpg.h>
 //#include "mod_cpg.h"
 
+#include "node.h"
+
 typedef enum{
     MASTER,
     BACKUP,
@@ -36,11 +38,7 @@ typedef enum{
     STANDBY
 } profile_state_t;///serve davvero?
 
-typedef struct node {
-    uint32_t nodeid;
-    int priority;
-    struct node *next;
-} node_t;
+
 
 typedef struct {
     char name[255];
@@ -77,11 +75,5 @@ switch_status_t from_backup_to_standby(profile_t *profile);
 switch_status_t from_init_to_standby(profile_t *profile);
 
 switch_status_t go_to_standby(profile_t *profile);
-
-node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority);
-node_t *node_remove(node_t *oldlist, uint32_t nodeid);
-switch_status_t node_remove_all(node_t *list);
-node_t *node_search(node_t *list, uint32_t nodeid);
-size_t list_entries(node_t *list);
 
 #endif
