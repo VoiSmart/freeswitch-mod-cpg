@@ -23,7 +23,7 @@
  *
  */
 
-#include "profile.h"
+#include "cpg_profile.h"
 
 #include <switch.h>
 #include "cpg_utils.h"

@@ -30,7 +30,7 @@
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 
-#include "profile.h"
+#include "cpg_profile.h"
 #include "arpator.h"
 
 typedef enum {

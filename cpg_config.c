@@ -26,7 +26,7 @@
 #include "cpg_config.h"
 
 #include "cpg_utils.h"
-#include "profile.h"
+#include "cpg_profile.h"
 
 /*
     TODO riceve filename e puntatore all'area di memoria da riempire

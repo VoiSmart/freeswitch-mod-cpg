@@ -9,14 +9,14 @@ CC=gcc
 INCLUDE= -lcpg -lnl -I$(INSTDIR)/include
 CFLAGS= -fPIC -Werror -fvisibility=hidden -DSWITCH_API_VISIBILITY=1 -DHAVE_VISIBILITY=1 -g -ggdb -g -O2 -Wall -std=c99 -pedantic -Wdeclaration-after-statement -D_GNU_SOURCE -DHAVE_CONFIG_H
 LDFLAGS=
-SOURCES= arpator.c node.c cpg_utils.c profile.c mod_cpg.c cpg_config.c cpg_actions.c
+SOURCES= mod_cpg.c arpator.c node.c cpg_utils.c cpg_profile.c cpg_config.c cpg_actions.c
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=mod_cpg.so
 
 all: $(SOURCES) $(EXECUTABLE)
 	
 $(EXECUTABLE): $(OBJECTS) 
-	$(CC) $(INCLUDE) $(CFLAGS) $(LDFLAGS) -lm -module -avoid-version -o mod_cpg.so -shared -Xlinker -x mod_cpg.o arpator.o node.o cpg_utils.o profile.o cpg_config.o cpg_actions.o
+	$(CC) $(INCLUDE) $(CFLAGS) $(LDFLAGS) -lm -module -avoid-version -o mod_cpg.so -shared -Xlinker -x mod_cpg.o arpator.o node.o cpg_utils.o cpg_profile.o cpg_config.o cpg_actions.o
 
 .c.o:
 	$(CC) $(INCLUDE) $(CFLAGS) -c $< -o $@

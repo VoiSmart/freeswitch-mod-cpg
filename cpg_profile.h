@@ -22,8 +22,8 @@
  * Phone : +39.02.70633354
  *
  */
-#ifndef PROFILE_H
-#define PROFILE_H
+#ifndef CPG_PROFILE_H
+#define CPG_PROFILE_H
 
 #include <switch.h>
 #include <corosync/cpg.h>

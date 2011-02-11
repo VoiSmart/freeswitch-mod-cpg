@@ -25,7 +25,7 @@
 #ifndef CPG_ACTIONS_H
 #define CPG_ACTIONS_H
 
-#include "profile.h"
+#include "cpg_profile.h"
 
 switch_status_t from_standby_to_init(profile_t *profile);
 switch_status_t from_init_to_backup(profile_t *profile);

@@ -24,7 +24,7 @@
  */
 #include "mod_cpg.h"
 
-#include "profile.h"
+#include "cpg_profile.h"
 #include "cpg_utils.h"
 #include "cpg_config.h"
 

@@ -26,7 +26,7 @@
 #define CPG_UTILS_H
 #include <switch.h>
 #include "mod_cpg.h"
-#include "profile.h"
+#include "cpg_profile.h"
 
 /*system utils*/
 switch_status_t utils_add_vip(char *ip,char *dev);
