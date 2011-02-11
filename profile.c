@@ -1,9 +1,32 @@
+/*
+ * Closed Process Group (Corosync CPG) failover module for Freeswitch
+ *
+ * Copyright (C) 2010 Voismart SRL
+ *
+ * Authors: Stefano Bossi <sbossi@voismart.it>
+ *
+ * Further Contributors:
+ * Matteo Brancaleoni <mbrancaleoni@voismart.it> - Original idea
+ *
+ * This program cannot be modified, distributed or used without
+ * specific written permission of the copyright holder.
+ *
+ * The source code is provided only for evaluation purposes.
+ * Any usage or license must be negotiated directly with Voismart Srl.
+ *
+ * Voismart Srl
+ * Via Benigno Crespi 12
+ * 20159 Milano - MI
+ * ITALY
+ *
+ * Phone : +39.02.70633354
+ *
+ */
 
 #include "profile.h"
 
 #include <switch.h>
 #include "cpg_utils.h"
-#include "arpator.h"
 
 profile_t *find_profile_by_name(char *profile_name)
 {
@@ -53,9 +76,7 @@ switch_status_t from_init_to_master(profile_t *profile)
     }
 
     // gratuitous arp request
-    if (net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1,
-                                profile->mac, profile->virtual_ip, profile->mac,
-                                    profile->virtual_ip, profile->device) < 0) {
+    if (utils_send_gARP(profile->mac, profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
         utils_remove_vip(profile->virtual_ip, profile->device);
         goto error;
     }
@@ -79,9 +100,7 @@ switch_status_t from_backup_to_master(profile_t *profile)
     }
 
     // gratuitous arp request
-    if (net_send_arp_string(profile->mac, "ff:ff:ff:ff:ff:ff", 1,
-                                profile->mac, profile->virtual_ip, profile->mac,
-                                    profile->virtual_ip, profile->device) < 0) {
+    if (utils_send_gARP(profile->mac, profile->virtual_ip, profile->device) != SWITCH_STATUS_SUCCESS) {
         utils_remove_vip(profile->virtual_ip, profile->device);
         goto error;
     }
