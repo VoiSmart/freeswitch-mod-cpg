@@ -24,9 +24,10 @@
  */
 #include "mod_cpg.h"
 
-#include "cpg_profile.h"
 #include "cpg_utils.h"
 #include "cpg_config.h"
+#include "cpg_virtual_ip.h"
+
 
 
 
@@ -41,9 +42,8 @@ SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, mod_cpg_runtim
 
 
 void event_handler(switch_event_t *event);
-switch_status_t start_profiles();
-switch_status_t stop_profiles();
-switch_status_t stop_profiles_with_ip(char *profile_ip);
+switch_status_t start_virtual_ips();
+switch_status_t stop_virtual_ips();
 
 
 switch_status_t cmd_status(switch_stream_handle_t *stream)
@@ -51,7 +51,7 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     switch_hash_index_t *hi;
     void *val;
     const void *vvar;
-    profile_t *profile = NULL;
+    virtual_ip_t *vip = NULL;
     const char *line = "=================================================================================================";
     const char *line2 = "-------------------------------------------------------------------------------------------------";
 
@@ -62,16 +62,16 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
                                                     hi = switch_hash_next(hi)) {
         node_t *list;
         switch_hash_this(hi, &vvar, NULL, &val);
-        profile = (profile_t *) val;
-        list = profile->node_list;
+        vip = (virtual_ip_t *) val;
+        list = vip->node_list;
 
         stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n",
-                                             profile->name, profile->virtual_ip,
-                                          utils_state_to_string(profile->state),
-                                                    profile->running?"":" not");
+                                             vip->address, vip->address,
+                                          utils_state_to_string(vip->state),
+                                                    vip->running?"":" not");
         stream->write_function(stream, "%s\n", line2);
         stream->write_function(stream,"\tMy master is %s\n",
-                                     utils_node_pid_format(profile->master_id));
+                                     utils_node_pid_format(vip->master_id));
         stream->write_function(stream, "%s\n", line2);
         if (list == NULL)
             stream->write_function(stream,"\tEmpty list\n");
@@ -81,12 +81,12 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
             list = list->next;
         }
         stream->write_function(stream, "%s\n", line2);
-        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(profile->name));
-        if (profile->rollback_node_id != 0) {
+        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));
+        if (vip->rollback_node_id != 0) {
             stream->write_function(stream, "%s\n", line2);
             stream->write_function(stream,
                                   "\tRollback timer started, migration to %s\n",
-                              utils_node_pid_format(profile->rollback_node_id));
+                              utils_node_pid_format(vip->rollback_node_id));
         }
         stream->write_function(stream, "%s\n", line);
 
@@ -101,29 +101,29 @@ switch_status_t start_profiles()
     switch_hash_index_t *hi;
     void *val;
     const void *vvar;
-    profile_t *profile = NULL;
+    virtual_ip_t *vip = NULL;
 
     for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
                                                       hi = switch_hash_next(hi))
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
-        profile = (profile_t *) val;
-        if (profile->autoload == SWITCH_TRUE) {
+        vip = (virtual_ip_t *) val;
+        if (vip->autoload == SWITCH_TRUE) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                                  "launch %s\n", profile->name);
-            profile_start(profile);
+                                                  "launch %s\n", vip->address);
+            virtual_ip_start(vip);
         }
     }
     return SWITCH_STATUS_SUCCESS;
 }
 
-switch_status_t stop_profiles()
+switch_status_t stop_virtual_ips()
 {
     switch_hash_index_t *hi;
     void *val;
     const void *vvar;
-    profile_t *profile = NULL;
+    virtual_ip_t *vip = NULL;
     switch_status_t status;
 
     for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
@@ -131,19 +131,19 @@ switch_status_t stop_profiles()
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
-        profile = (profile_t *) val;
-        if (profile->running) {
+        vip = (virtual_ip_t *) val;
+        if (vip->running) {
             int result;
-            profile->running = 0;
-            switch_thread_join(&status, profile->profile_thread);
+            vip->running = 0;
+            switch_thread_join(&status, vip->virtual_ip_thread);
 
-            profile_stop(profile);
+            virtual_ip_stop(vip);
 
-            result = cpg_leave(profile->handle, &profile->group_name);
+            result = cpg_leave(vip->handle, &vip->group_name);
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                  "Leave  result is %d (should be 1)\n", result);
             switch_yield(10000);
-            result = cpg_finalize (profile->handle);
+            result = cpg_finalize (vip->handle);
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                               "Finalize  result is %d (should be 1)\n", result);
         }
@@ -151,63 +151,14 @@ switch_status_t stop_profiles()
     return SWITCH_STATUS_SUCCESS;
 }
 
-switch_status_t stop_profiles_with_ip(char *profile_ip)
-{
-    switch_hash_index_t *hi;
-    void *val;
-    const void *vvar;
-    profile_t *profile = NULL;
-    switch_status_t status = SWITCH_STATUS_FALSE;
-
-    if (zstr(profile_ip)) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"IP == NULL!\n");
-        return SWITCH_STATUS_FALSE;
-    }
-
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
-               "Searching for profile with shared virtual ip %s\n", profile_ip);
-
-    for (hi = switch_hash_first(NULL, globals.profile_hash); hi;
-                                                      hi = switch_hash_next(hi))
-    {
-
-        switch_hash_this(hi, &vvar, NULL, &val);
-        profile = (profile_t *) val;
-
-        if ((profile->running) &&
-                                (!strcasecmp(profile->virtual_ip, profile_ip))){
-            int result;
-
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
-                                        "Found profile %s with virtual ip %s\n",
-                                            profile->name, profile->virtual_ip);
-
-            profile->autoload = SWITCH_FALSE;
-            /*se lo spengo tolgo l'autoload altrimenti riparte se c'è una riconnessione'*/
-            profile->running = 0;
-            switch_thread_join(&status, profile->profile_thread);
-
-            profile_stop(profile);
-
-            result = cpg_leave(profile->handle, &profile->group_name);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                 "Leave  result is %d (should be 1)\n", result);
-            switch_yield(10000);
-            result = cpg_finalize (profile->handle);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                              "Finalize  result is %d (should be 1)\n", result);
-        }
-    }
-    return SWITCH_STATUS_SUCCESS;
-}
 
 switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream)
 {
 
-    profile_t *profile = NULL;
-    char *profile_name = argv[0];
+    virtual_ip_t *vip = NULL;
+    char *address = argv[0];
 
-    profile = find_profile_by_name(profile_name);
+    vip = find_virtual_ip(address);
 
     if (argc != 2) {
         stream->write_function(stream, "Invalid Args!\n");
@@ -216,13 +167,13 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 
     if (!strcasecmp(argv[1], "start")) {
 
-        if (profile != NULL) {
-            if (!profile->running) {
+        if (vip != NULL) {
+            if (!vip->running) {
 
-                profile_start(profile);
+                virtual_ip_start(vip);
                 //FIXME okkio che non voglio esporre sti flag.. 
                 //TODO cmq dovrei separare quelli di runtime da quelli di conf
-                profile->autoload = SWITCH_TRUE;
+                vip->autoload = SWITCH_TRUE;
                 /*se lo accendo metto l'autoload così riparte se c'è una riconnessione*/
                 stream->write_function(stream, "starting %s\n", argv[0]);
             } else {
@@ -237,11 +188,11 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
     }
     if (!strcasecmp(argv[1], "stop")) {
 
-        if (profile != NULL) {
-            if (profile->running) {
+        if (vip != NULL) {
+            if (vip->running) {
                 stream->write_function(stream, "stopping %s\n", argv[0]);
 
-                stop_profiles_with_ip(profile->virtual_ip);
+                stop_virtual_ips();
             } else {
                 stream->write_function(stream,
                                            "Profile %s not running\n", argv[0]);
@@ -357,7 +308,7 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
 
     switch_console_set_complete("del cpg");
 
-    stop_profiles();
+    stop_virtual_ips();
     globals.running = 0;
     switch_event_unbind(&globals.node);
     switch_core_hash_destroy(&globals.profile_hash);
@@ -370,15 +321,15 @@ switch_status_t profiles_state_notification()
     switch_hash_index_t *hi;
     void *val;
     const void *vvar;
-    profile_t *profile = NULL;
+    virtual_ip_t *vip = NULL;
 
     for (hi = switch_hash_first(NULL, globals.profile_hash); hi; hi = switch_hash_next(hi)) {
 
         switch_hash_this(hi, &vvar, NULL, &val);
-        profile = (profile_t *) val;
-        if (profile->running) {
+        vip = (virtual_ip_t *) val;
+        if (vip->running) {
 
-            profile_send_state(profile);
+            virtual_ip_send_state(vip);
 
         }
     }
@@ -388,16 +339,16 @@ switch_status_t profiles_state_notification()
 void event_handler(switch_event_t *event)
 {
     char *sql = NULL;
-    char *profile_name = NULL;
+    char *address = NULL;
 
     switch_assert(event);        // Just a sanity check
 
-    if ((sql = switch_event_get_header_nil(event, "sql")) && (profile_name = switch_event_get_header_nil(event, "profile_name"))) {
-        profile_t *profile;
+    if ((sql = switch_event_get_header_nil(event, "sql")) && (address = switch_event_get_header_nil(event, "profile_name"))) {
+        virtual_ip_t *vip;
 
-        if ((profile = find_profile_by_name(profile_name))) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",profile->name);
-            profile_send_sql(profile,sql);
+        if ((vip = find_virtual_ip(address))) {
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",vip->address);
+            virtual_ip_send_sql(vip,sql);
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
         }
@@ -422,7 +373,7 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
 
         if (system(cmd) != 0) {
             globals.is_connected = SWITCH_FALSE;
-            stop_profiles();
+            stop_virtual_ips();
         } else { //è andato a buon fine
             if (globals.is_connected == SWITCH_FALSE) { //se ero standby divento init
                 globals.is_connected = SWITCH_TRUE;

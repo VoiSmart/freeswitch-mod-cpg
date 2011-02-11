@@ -30,7 +30,7 @@
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 
-#include "cpg_profile.h"
+#include "cpg_virtual_ip.h"
 #include "arpator.h"
 
 typedef enum {
@@ -323,7 +323,7 @@ switch_status_t utils_stop_sofia_profile(char *profile_name)
     return SWITCH_STATUS_FALSE;
 }
 
-char *utils_state_to_string(profile_state_t pstate)
+char *utils_state_to_string(virtual_ip_state_t pstate)
 {
     char state[12];
     switch (pstate) {
@@ -346,9 +346,9 @@ char *utils_state_to_string(profile_state_t pstate)
     return strdup(state);
 }
 
-profile_state_t utils_string_to_state(char *state)
+virtual_ip_state_t utils_string_to_state(char *state)
 {
-    profile_state_t pstate = STANDBY;
+    virtual_ip_state_t pstate = STANDBY;
     if (!strcasecmp(state,"MASTER")) pstate = MASTER;
     else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
     else if (!strcasecmp(state,"INIT")) pstate = INIT;
