@@ -26,21 +26,15 @@
 #define CPG_UTILS_H
 #include <switch.h>
 #include "mod_cpg.h"
-#include "cpg_virtual_ip.h"
 
 /*system utils*/
 switch_status_t utils_add_vip(char *ip,char *dev);
 switch_status_t utils_remove_vip(char *ip,char *dev);
-switch_status_t utils_add_arp_rule(char *ip,char *mac);//TODO prova a rimuovermi
-switch_status_t utils_remove_arp_rule(char *ip,char *mac);
 char *utils_get_mac_addr(char *dev);
 switch_bool_t utils_ip_is_valid(char *address);
 int utils_get_netmask(char *netmask);
 switch_status_t utils_send_gARP(char *mac, char *address, char *device);
 
-/*local utils*/
-char *utils_state_to_string(virtual_ip_state_t pstate);
-virtual_ip_state_t utils_string_to_state(char *state);
 
 /*freeswitch related utils*/
 switch_status_t utils_profile_control(char *sofia_profile_name);

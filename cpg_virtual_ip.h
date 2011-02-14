@@ -80,4 +80,8 @@ switch_status_t virtual_ip_stop(virtual_ip_t *vip);
 switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 
+/*local utils*/
+char *utils_state_to_string(virtual_ip_state_t pstate);
+virtual_ip_state_t utils_string_to_state(char *state);
+
 #endif

@@ -30,7 +30,6 @@
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 
-#include "cpg_virtual_ip.h"
 #include "arpator.h"
 
 typedef enum {
@@ -177,41 +176,6 @@ switch_status_t utils_remove_vip(char *ip,char *dev)
     }
 }
 
-switch_status_t utils_add_arp_rule(char *ip,char *mac)
-{
-
-    if ((!zstr(ip)) && (!zstr(mac))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"arptables -A OUT -s %s --source-mac %s -j DROP", ip, mac);
-        if (system(cmd)){
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot add arptables rule\n");
-            return SWITCH_STATUS_FALSE;
-        }
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"added arptables rule\n");
-        return SWITCH_STATUS_SUCCESS;
-    } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid ip or mac\n");
-        return SWITCH_STATUS_FALSE;
-    }
-}
-
-switch_status_t utils_remove_arp_rule(char *ip,char *mac)
-{
-
-    if ((!zstr(ip)) && (!zstr(mac))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"arptables -F OUT");
-        if (system(cmd)){
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot remove arptables rule\n");
-            return SWITCH_STATUS_FALSE;
-        }
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"removed arptables rule\n");
-        return SWITCH_STATUS_SUCCESS;
-    } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid ip or mac\n");
-        return SWITCH_STATUS_FALSE;
-    }
-}
 char *utils_get_mac_addr(char *interface)
 {
     int buflen = 20;
@@ -321,40 +285,6 @@ switch_status_t utils_stop_sofia_profile(char *profile_name)
         return SWITCH_STATUS_FALSE;
     }
     return SWITCH_STATUS_FALSE;
-}
-
-char *utils_state_to_string(virtual_ip_state_t pstate)
-{
-    char state[12];
-    switch (pstate) {
-            case MASTER:
-                switch_snprintf(state,sizeof(state),"MASTER");
-                break;
-            case BACKUP:
-                switch_snprintf(state,sizeof(state),"BACKUP");
-                break;
-            case INIT:
-                switch_snprintf(state,sizeof(state),"INIT");
-                break;
-            case STANDBY:
-                switch_snprintf(state,sizeof(state),"STANDBY");
-                break;
-            default:
-                switch_snprintf(state,sizeof(state),"Missing");
-                break;
-    }
-    return strdup(state);
-}
-
-virtual_ip_state_t utils_string_to_state(char *state)
-{
-    virtual_ip_state_t pstate = STANDBY;
-    if (!strcasecmp(state,"MASTER")) pstate = MASTER;
-    else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
-    else if (!strcasecmp(state,"INIT")) pstate = INIT;
-    else if (!strcasecmp(state,"STANDBY")) pstate = STANDBY;
-
-    return pstate;
 }
 
 void utils_hupall(char *profile_name)

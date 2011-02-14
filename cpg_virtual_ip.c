@@ -81,6 +81,39 @@ virtual_ip_t *find_virtual_ip(char *address)
     return vip;
 }
 
+char *utils_state_to_string(virtual_ip_state_t pstate)
+{
+    char state[12];
+    switch (pstate) {
+            case MASTER:
+                switch_snprintf(state,sizeof(state),"MASTER");
+                break;
+            case BACKUP:
+                switch_snprintf(state,sizeof(state),"BACKUP");
+                break;
+            case INIT:
+                switch_snprintf(state,sizeof(state),"INIT");
+                break;
+            case STANDBY:
+                switch_snprintf(state,sizeof(state),"STANDBY");
+                break;
+            default:
+                switch_snprintf(state,sizeof(state),"Missing");
+                break;
+    }
+    return strdup(state);
+}
+
+virtual_ip_state_t utils_string_to_state(char *state)
+{
+    virtual_ip_state_t pstate = STANDBY;
+    if (!strcasecmp(state,"MASTER")) pstate = MASTER;
+    else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
+    else if (!strcasecmp(state,"INIT")) pstate = INIT;
+    else if (!strcasecmp(state,"STANDBY")) pstate = STANDBY;
+
+    return pstate;
+}
 
 void launch_rollback_thread(virtual_ip_t *vip)
 {
