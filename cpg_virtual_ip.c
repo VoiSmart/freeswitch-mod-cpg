@@ -71,7 +71,7 @@ static cpg_callbacks_t callbacks = {
 void launch_rollback_thread(virtual_ip_t *vip);
 void *SWITCH_THREAD_FUNC vip_thread_run(switch_thread_t *thread, void *obj);
 void *SWITCH_THREAD_FUNC rollback_thread_run(switch_thread_t *thread, void *obj);
-static int send_message(cpg_handle_t h, void *buf, int len);
+static switch_status_t send_message(cpg_handle_t h, void *buf, int len);
 
 virtual_ip_t *find_virtual_ip(char *address)
 {
@@ -475,11 +475,12 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql)
     header_t *hd;
     char *buf;
     int len;
+    switch_status_t status;
 
     len = sizeof(header_t) + strlen(sql) + 1;
     buf = malloc(len);
     if (buf == NULL) {
-        return SWITCH_FALSE;
+        return SWITCH_STATUS_FALSE;
     }
     memset(buf,0,len);
 
@@ -488,11 +489,11 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql)
 
     memcpy(buf+sizeof(header_t), sql, strlen(sql) + 1);
 
-    send_message(vip->handle,buf,len);
+    status = send_message(vip->handle,buf,len);
 
     free(buf);
 
-    return SWITCH_STATUS_SUCCESS;
+    return status;
 }
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip)
 {
@@ -500,11 +501,12 @@ switch_status_t virtual_ip_send_state(virtual_ip_t *vip)
     node_msg_t *nm;
     char *buf;
     int len;
+    switch_status_t status;
 
     len = sizeof(header_t) + sizeof(node_msg_t);
     buf = malloc(len);
     if (buf == NULL) {
-        return SWITCH_FALSE;
+        return SWITCH_STATUS_FALSE;
     }
     memset(buf,0,len);
 
@@ -517,15 +519,15 @@ switch_status_t virtual_ip_send_state(virtual_ip_t *vip)
     nm->priority = vip->priority;
     switch_snprintf(nm->runtime_uuid,sizeof(nm->runtime_uuid),"%s",switch_core_get_uuid());
 
-    send_message(vip->handle,buf,len);
+    status = send_message(vip->handle,buf,len);
 
     free(buf);
 
-    return SWITCH_STATUS_SUCCESS;
+    return status;
 }
 
 
-static int send_message(cpg_handle_t h, void *buf, int len)
+static switch_status_t send_message(cpg_handle_t h, void *buf, int len)
 {
     struct iovec iov;
     cpg_error_t error;
@@ -547,12 +549,12 @@ static int send_message(cpg_handle_t h, void *buf, int len)
     if (error != CPG_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"cpg_mcast_joined error %d handle %llx\n",
               error, (unsigned long long)h);
-        return -1;
+        return SWITCH_STATUS_FALSE;
     }
 
     if (retries)
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"cpg_mcast_joined retried %d\n",
               retries);
 
-    return 0;
+    return SWITCH_STATUS_SUCCESS;
 }
