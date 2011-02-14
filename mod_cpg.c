@@ -67,7 +67,7 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
 
         stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n",
                                              vip->address, vip->address,
-                                          utils_state_to_string(vip->state),
+                                              virtual_ip_get_state(vip),
                                                     vip->running?"":" not");
         stream->write_function(stream, "%s\n", line2);
         stream->write_function(stream,"\tMy master is %s\n",

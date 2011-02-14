@@ -29,19 +29,14 @@
 #include <corosync/cpg.h>
 
 #include "node.h"
-
+#include "cpg_actions.h"
 #define MAX_SOFIA_PROFILE 8
 
-typedef enum{
-    MASTER,
-    BACKUP,
-    INIT,
-    STANDBY
-} virtual_ip_state_t;
 
 typedef struct {
     char name[256];
     switch_bool_t autorecover;
+    switch_bool_t running;
 } sofia_profile_t;
 
 typedef struct {
@@ -59,7 +54,7 @@ typedef struct {
     sofia_profile_t profiles[MAX_SOFIA_PROFILE];
 
 /*runtime information*/
-    virtual_ip_state_t state;
+    state_t state;
     switch_thread_t *virtual_ip_thread;
     switch_bool_t running;
     cpg_handle_t handle;
@@ -81,7 +76,7 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 
 /*local utils*/
-char *utils_state_to_string(virtual_ip_state_t pstate);
-virtual_ip_state_t utils_string_to_state(char *state);
+
+char *virtual_ip_get_state(virtual_ip_t *vip);
 
 #endif
