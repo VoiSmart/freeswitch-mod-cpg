@@ -22,23 +22,25 @@
  * Phone : +39.02.70633354
  *
  */
-#ifndef MOD_CPG_H
-#define MOD_CPG_H
+#ifndef CPG_STATES_EVENTS_H
+#define CPG_STATES_EVENTS_H
+typedef enum {
+    EVT_START,
+    EVT_MASTER_DOWN,
+    EVT_MASTER_UP,
+    EVT_BACKUP_DOWN,
+    EVT_BACKUP_UP,
+    EVT_STOP,
+    MAX_EVENTS
+} event_t;
 
-#include <switch.h>
-#include <corosync/cpg.h>
-#include <corosync/swab.h>
-#include <string.h>
-
-struct {
-	switch_memory_pool_t *pool;
-	switch_hash_t *virtual_ip_hash;
-	short int running;
-	switch_bool_t is_connected;
-	cpg_handle_t handle;
-//	struct cpg_name group_name;
-	switch_event_node_t *node;
-} globals;
-
-
+typedef enum {
+    ST_IDLE,
+    ST_START,
+    ST_BACKUP,
+    ST_MASTER,
+    ST_RBACK,
+    ST_STOP,
+    MAX_STATES
+} state_t;
 #endif

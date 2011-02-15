@@ -27,13 +27,8 @@
 
 #include <switch.h>
 #include "cpg_utils.h"
-#include "cpg_actions.h"
+#include "fsm_input.h"
 
-typedef struct {
-    int priority;
-    virtual_ip_state_t state;
-    char runtime_uuid[40];
-} node_msg_t;
 
 typedef enum {
     SQL,
@@ -81,21 +76,27 @@ virtual_ip_t *find_virtual_ip(char *address)
     return vip;
 }
 
-char *utils_state_to_string(virtual_ip_state_t pstate)
+char *virtual_ip_get_state(virtual_ip_t *vip)
 {
     char state[12];
-    switch (pstate) {
-            case MASTER:
+    switch (vip->state) {
+            case ST_IDLE:
+                switch_snprintf(state,sizeof(state),"IDLE");
+                break;
+            case ST_START:
+                switch_snprintf(state,sizeof(state),"START");
+                break;
+            case ST_MASTER:
                 switch_snprintf(state,sizeof(state),"MASTER");
                 break;
-            case BACKUP:
+            case ST_BACKUP:
                 switch_snprintf(state,sizeof(state),"BACKUP");
                 break;
-            case INIT:
-                switch_snprintf(state,sizeof(state),"INIT");
+            case ST_RBACK:
+                switch_snprintf(state,sizeof(state),"RBACK");
                 break;
-            case STANDBY:
-                switch_snprintf(state,sizeof(state),"STANDBY");
+            case ST_STOP:
+                switch_snprintf(state,sizeof(state),"STOP");
                 break;
             default:
                 switch_snprintf(state,sizeof(state),"Missing");
@@ -104,14 +105,15 @@ char *utils_state_to_string(virtual_ip_state_t pstate)
     return strdup(state);
 }
 
-virtual_ip_state_t utils_string_to_state(char *state)
+state_t string_to_state(char *state)
 {
-    virtual_ip_state_t pstate = STANDBY;
-    if (!strcasecmp(state,"MASTER")) pstate = MASTER;
-    else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
-    else if (!strcasecmp(state,"INIT")) pstate = INIT;
-    else if (!strcasecmp(state,"STANDBY")) pstate = STANDBY;
-
+    state_t pstate = ST_IDLE;
+    if (!strcasecmp(state,"MASTER")) pstate = ST_MASTER;
+    else if (!strcasecmp(state,"BACKUP")) pstate = ST_BACKUP;
+    else if (!strcasecmp(state,"IDLE")) pstate = ST_IDLE;
+    else if (!strcasecmp(state,"STOP")) pstate = ST_STOP;
+    else if (!strcasecmp(state,"RBACK")) pstate = ST_RBACK;
+    else if (!strcasecmp(state,"START")) pstate = ST_START;
     return pstate;
 }
 
@@ -307,61 +309,7 @@ static void DeliverCallback (
 
         nm = (node_msg_t *)(((char *)msg ) + sizeof(header_t));
 
-        vip->node_list = node_add(vip->node_list, nodeid, nm->priority);
-
-        if (nm->state == MASTER) {
-            vip->master_id = nodeid;
-            switch_snprintf(vip->runtime_uuid, sizeof(vip->runtime_uuid),"%s", nm->runtime_uuid );
-        }
-
-        switch (vip->state) {
-
-            case INIT:
-                if ((nm->priority == vip->priority) && (nodeid != vip->node_id)) {
-                    int result;
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                           "Node with the same priority detected!Please change it!\n");
-                    from_init_to_standby(vip);
-                    result = cpg_leave(vip->handle, &vip->group_name);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                        "Leave  result is %d (should be 1)\n", result);
-                    switch_yield(10000);
-                    result = cpg_finalize (vip->handle);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                     "Finalize  result is %d (should be 1)\n", result);
-                    break;
-                }
-
-                // if the priority list is complete becomes BACKUP
-                if (list_entries(vip->node_list) == vip->member_list_entries) {
-                    from_init_to_backup(vip);
-                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "I'm a BACKUP!\n");
-                }
-                break;
-            case BACKUP:
-                break;
-            case MASTER:
-                if (vip->node_list != NULL ) {
-                    if ((vip->autorollback == SWITCH_TRUE) &&
-                        (vip->node_list->nodeid != vip->node_id) &&
-                        (vip->node_list->nodeid != vip->rollback_node_id)) {
-
-                        vip->rollback_node_id = vip->node_list->nodeid;
-
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                                              "ROLLBACK node %u(!=%u) found!\n",
-                                                     vip->node_list->nodeid,
-                                                              vip->node_id);
-
-                        launch_rollback_thread(vip);
-                        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                                                   "ROLLBACK timer started!\n");
-                    }
-                }
-                break;
-            default:
-                break;
-        }
+        fsm_input_new_state_message(vip, nm);
         break;
     }
     default:
@@ -395,76 +343,17 @@ static void ConfchgCallback (
 
     // left
     if (left_list_entries > 0) {
-        switch_bool_t master_flag = SWITCH_FALSE;
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "LEFT!\n");
-        // remove nodes gone down
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "Someone left!\n");
 
         for (i = 0; i < left_list_entries; i++) {
-            if ( left_list[i].nodeid == vip->master_id) {
-                master_flag = SWITCH_TRUE;
-                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"Master down!\n");
-            }
-            vip->node_list = node_remove(vip->node_list, left_list[i].nodeid);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"i = %d, nodeid = %u\n",i,left_list[i].nodeid);
-        }
-        switch (vip->state) {
-
-            case INIT:
-                //
-                break;
-            case BACKUP:
-                // If master is down
-                if (master_flag == SWITCH_TRUE) {
-                    //
-                    // if I'm the first in priority list
-                    if ( vip->node_list->nodeid == vip->node_id) {
-                        // become master
-                        from_backup_to_master(vip);
-                        // and I say it to all other nodes
-                        virtual_ip_send_state(vip);
-                    } else {
-                        // clean up the table
-                        char *sql;
-                        //FIXME sistemare la delete con il nome del profilo!
-                        sql = switch_mprintf("delete from sip_recovery where "
-                                     "runtime_uuid='%q' and profile_name='%q'",
-                                          vip->runtime_uuid, vip->address);
-
-                        utils_send_track_event(sql, vip->address);
-                        switch_safe_free(sql);
-                    }
-                }
-                break;
-            case MASTER:
-                break;
-            default:
-                break;
+            fsm_input_node_down(vip, left_list[i].nodeid);
         }
     }
 
     // join
     if (joined_list_entries > 0) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "JOIN!\n");
-        // if someone has joined I send him my infos
-        virtual_ip_send_state(vip);
-
-        switch (vip->state) {
-            case INIT:
-                // if I'm alone
-                if (member_list_entries == 1) {
-                    // I'm the master
-                    from_init_to_master(vip);
-                    virtual_ip_send_state(vip);
-                }
-                // else I have to fill priority table
-                break;
-            case BACKUP:
-                break;
-            case MASTER:
-                break;
-            default:
-                break;
-        }
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "Someone join!\n");
+        fsm_input_node_up(vip, member_list_entries);
     }
 
 }

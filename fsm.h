@@ -22,20 +22,17 @@
  * Phone : +39.02.70633354
  *
  */
-#ifndef CPG_ACTIONS_H
-#define CPG_ACTIONS_H
+#ifndef FSM_H
+#define FSM_H
 
-#include "cpg_virtual_ip.h"
+#include <switch.h>
+#include "states_events.h"
+#include "virtual_ip_type.h"
 
-switch_status_t from_standby_to_init(virtual_ip_t *vip);
-switch_status_t from_init_to_backup(virtual_ip_t *vip);
-switch_status_t from_init_to_master(virtual_ip_t *vip);
-switch_status_t from_backup_to_master(virtual_ip_t *vip);
-switch_status_t from_master_to_standby(virtual_ip_t *vip);
-switch_status_t from_backup_to_standby(virtual_ip_t *vip);
-switch_status_t from_init_to_standby(virtual_ip_t *vip);
+typedef switch_status_t (*const action_t) (virtual_ip_t *vip);
 
-switch_status_t go_to_standby(virtual_ip_t *vip);
+action_t fsm_do_transaction(event_t event, state_t state);
 
+state_t get_state(virtual_ip_t *vip);
 
 #endif
