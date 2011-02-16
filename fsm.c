@@ -27,6 +27,7 @@
 #include <switch.h>
 #include "cpg_utils.h"
 #include "cpg_virtual_ip.h"
+#include "mod_cpg.h"
 
 /*actions definitions*/
 switch_status_t react(virtual_ip_t *vip);
@@ -61,12 +62,14 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 
 /*actions chooser*/
 action_t fsm_do_transaction(event_t event, state_t state) {
-
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                      "state = %s, event = %s\n",
+                      state_to_string(state), event_to_string(event));
     if (((event < 0) || (event >= MAX_EVENTS))
      || ((state < 0) || (state >= MAX_STATES))) {
         return error;
     }
-    return table[state][event];
+    return table[event][state];
 
 }
 
@@ -142,7 +145,8 @@ switch_status_t rollbackCK(virtual_ip_t * vip)
 switch_status_t react(virtual_ip_t *vip)
 {
     // if I'm the first in priority list
-    if ( vip->node_list->nodeid == vip->node_id) {
+    if ( vip->node_id == node_first(vip->node_list)) {
+printf("react!\n");
         // become master
         vip->state = ST_MASTER;
 
@@ -194,7 +198,6 @@ switch_status_t go_down(virtual_ip_t *vip)
     vip->state = ST_IDLE;
     vip->master_id = 0;
     vip->member_list_entries = 0;
-    vip->running = SWITCH_FALSE;
     vip->node_id = 0;
     vip->master_id = 0;
     vip->rollback_node_id = 0;
@@ -236,7 +239,7 @@ switch_status_t go_up(virtual_ip_t *vip)
     switch_threadattr_priority_increase(thd_attr);
     switch_thread_create(&(vip->virtual_ip_thread),
                          thd_attr, vip_thread, vip, globals.pool);
-    // start sofia profile?
+    //TODO start sofia profile?
     return SWITCH_STATUS_SUCCESS;
 }
 

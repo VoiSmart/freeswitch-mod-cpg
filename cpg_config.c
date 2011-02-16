@@ -26,8 +26,8 @@
 #include "cpg_config.h"
 
 #include "cpg_utils.h"
-#include "cpg_virtual_ip.h"
-
+#include "virtual_ip_types.h"
+#include "mod_cpg.h"
 /*
     TODO riceve filename e puntatore all'area di memoria da riempire
     ritorna SWITCH_STATUS_SUCCESS o SWITCH_STATUS_FALSE
@@ -49,7 +49,7 @@ switch_status_t do_config(char *cf)
                                                            "%s opened\n", cf);
 
 
-    for (xvip= switch_xml_child(cfg,"virtual_ip");
+    for (xvip= switch_xml_child(cfg,"virtualip");
                                   xvip; xvip = xvip->next) {
 
         char *address = NULL;
@@ -61,7 +61,7 @@ switch_status_t do_config(char *cf)
             return SWITCH_STATUS_FALSE;
         }
 
-        address = (char *) switch_xml_attr_soft(xvip, "virtual_ip");
+        address = (char *) switch_xml_attr_soft(xvip, "address");
         netmask = (char *) switch_xml_attr_soft(xvip, "cidr_netmask");
 
         if (utils_ip_is_valid(address) != SWITCH_TRUE) {

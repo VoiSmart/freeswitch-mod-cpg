@@ -26,7 +26,7 @@
 #define FSM_INPUT_H
 
 #include <switch.h>
-#include "virtual_ip_type.h"
+#include "virtual_ip_types.h"
 
 
 switch_status_t

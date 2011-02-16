@@ -27,7 +27,7 @@
 
 #include <switch.h>
 #include "node.h"
-#include "virtual_ip_type.h"
+#include "virtual_ip_types.h"
 
 
 switch_status_t virtual_ip_start(virtual_ip_t *vip);
@@ -38,6 +38,10 @@ switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 /*local utils*/
 char *virtual_ip_get_state(virtual_ip_t *vip);
 virtual_ip_t *find_virtual_ip(char *address);
+switch_bool_t vip_is_running(virtual_ip_t *vip);
+
+char *state_to_string(state_t state);
+char *event_to_string(event_t state);
 
 /*private*/
 void

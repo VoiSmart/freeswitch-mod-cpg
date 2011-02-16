@@ -28,7 +28,7 @@
 #include <switch.h>
 #include "cpg_utils.h"
 #include "fsm_input.h"
-
+#include "mod_cpg.h"
 
 typedef enum {
     SQL,
@@ -63,8 +63,34 @@ static cpg_callbacks_t callbacks = {
     .cpg_confchg_fn = ConfchgCallback,
 };
 
-
 static switch_status_t send_message(cpg_handle_t h, void *buf, int len);
+
+
+char *event_to_string(event_t event)
+{
+    char *evt_names[MAX_EVENTS] = {
+        "STARTUP",
+        "DUPLICATE",
+        "MASTER_DOWN",
+        "MASTER_UP",
+        "BACKUP_DOWN",
+        "RBACK_REQ",
+        "STOP"
+    };
+    return strndup(evt_names[event],11);
+}
+
+char *state_to_string(state_t state)
+{
+    char *st_names[MAX_STATES] = {
+        "IDLE",
+        "START",
+        "BACKUP",
+        "MASTER",
+        "RBACK"
+    };
+    return strndup(st_names[state],10);
+}
 
 virtual_ip_t *find_virtual_ip(char *address)
 {
@@ -72,30 +98,14 @@ virtual_ip_t *find_virtual_ip(char *address)
 
     if (!address)
         return NULL;
-
-    vip = (virtual_ip_t *)switch_core_hash_find(globals.virtual_ip_hash,
-                                                address);
+    vip = (virtual_ip_t *)
+            switch_core_hash_find(globals.virtual_ip_hash, address);
     return vip;
 }
 
 char *virtual_ip_get_state(virtual_ip_t *vip)
 {
-    char state[12];
-    switch (vip->state) {
-            case ST_IDLE: switch_snprintf(state,sizeof(state),"IDLE");
-                break;
-            case ST_START: switch_snprintf(state,sizeof(state),"START");
-                break;
-            case ST_MASTER: switch_snprintf(state,sizeof(state),"MASTER");
-                break;
-            case ST_BACKUP: switch_snprintf(state,sizeof(state),"BACKUP");
-                break;
-            case ST_RBACK: switch_snprintf(state,sizeof(state),"RBACK");
-                break;
-            default: switch_snprintf(state,sizeof(state),"Missing");
-                break;
-    }
-    return strdup(state);
+    return state_to_string(vip->state);
 }
 
 state_t string_to_state(char *state)
@@ -107,6 +117,11 @@ state_t string_to_state(char *state)
     else if (!strcasecmp(state,"RBACK")) pstate = ST_RBACK;
     else if (!strcasecmp(state,"START")) pstate = ST_START;
     return pstate;
+}
+
+switch_bool_t vip_is_running(virtual_ip_t *vip)
+{
+    return (vip->state != ST_IDLE)?SWITCH_TRUE:SWITCH_FALSE;
 }
 
 /* threads loops*/
@@ -192,7 +207,8 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
         goto finalize;
     }
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                      "Local node id is %x\n", vip->node_id);
+                      "Local node id is %s\n",
+                      utils_node_pid_format(vip->node_id));
 
     result = cpg_join(vip->handle, &vip->group_name);
     if (result != CS_OK) {
@@ -232,7 +248,7 @@ finalize:
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                       "Finalize  result is %d (should be 1)\n", result);
 end:
-    switch_yield(5000000);
+    switch_yield(10000);
 
     return NULL;
 }
@@ -328,7 +344,6 @@ static void ConfchgCallback (
                           SWITCH_LOG_INFO, "Someone join!\n");
 
         virtual_ip_send_state(vip);
-        fsm_input_node_up(vip, member_list_entries);
     }
 
 }

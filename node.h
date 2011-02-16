@@ -41,5 +41,6 @@ node_t *node_remove(node_t *oldlist, uint32_t nodeid);
 switch_status_t node_remove_all(node_t *list);
 node_t *node_search(node_t *list, uint32_t nodeid);
 size_t list_entries(node_t *list);
+uint32_t node_first(node_t *list);
 
 #endif

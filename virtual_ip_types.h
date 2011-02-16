@@ -28,8 +28,27 @@
 
 #include <switch.h>
 #include <corosync/cpg.h>
-#include "states_events.h"
 #include "node.h"
+
+typedef enum {
+    EVT_STARTUP,
+    EVT_DUPLICATE,
+    EVT_MASTER_DOWN,
+    EVT_MASTER_UP,
+    EVT_BACKUP_DOWN,
+    EVT_RBACK_REQ,
+    EVT_STOP,
+    MAX_EVENTS
+} event_t;
+
+typedef enum {
+    ST_IDLE,
+    ST_START,
+    ST_BACKUP,
+    ST_MASTER,
+    ST_RBACK,
+    MAX_STATES
+} state_t;
 
 typedef struct {
     char name[256];
@@ -54,7 +73,6 @@ typedef struct {
 /*runtime information*/
     state_t state;
     switch_thread_t *virtual_ip_thread;
-    switch_bool_t running;
     cpg_handle_t handle;
     uint32_t node_id;
     uint32_t master_id;
@@ -70,5 +88,6 @@ typedef struct {
     state_t state;
     char runtime_uuid[40];
 } node_msg_t;
+
 
 #endif

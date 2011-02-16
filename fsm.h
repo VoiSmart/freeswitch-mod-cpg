@@ -26,8 +26,7 @@
 #define FSM_H
 
 #include <switch.h>
-#include "states_events.h"
-#include "virtual_ip_type.h"
+#include "virtual_ip_types.h"
 
 typedef switch_status_t (*action_t) (virtual_ip_t *vip);
 

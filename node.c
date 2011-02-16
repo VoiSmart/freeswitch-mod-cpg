@@ -114,6 +114,13 @@ node_t *node_search(node_t *list, uint32_t nodeid)
     return list;
 }
 
+uint32_t node_first(node_t *list)
+{
+    if (!list)
+        return 0;
+    return (list->nodeid)?list->nodeid:0;
+}
+
 size_t list_entries(node_t *list)
 {
     int i;

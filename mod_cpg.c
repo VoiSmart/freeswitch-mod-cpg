@@ -36,9 +36,9 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown);
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load);
 
-SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime);
+/*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime);*/
 /*Defines a switch_loadable_module_function_table_t and a static const char[] modname*/
-SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, mod_cpg_runtime);
+SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, NULL/*mod_cpg_runtime*/);
 
 
 void event_handler(switch_event_t *event);
@@ -66,9 +66,9 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
         list = vip->node_list;
 
         stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n",
-                                             vip->address, vip->address,
-                                              virtual_ip_get_state(vip),
-                                                    vip->running?"":" not");
+                               vip->address, vip->address,
+                               virtual_ip_get_state(vip),
+                               (vip->state != ST_IDLE)?"":" not");
         stream->write_function(stream, "%s\n", line2);
         stream->write_function(stream,"\tMy master is %s\n",
                                      utils_node_pid_format(vip->master_id));
@@ -124,29 +124,15 @@ switch_status_t stop_virtual_ips()
     void *val;
     const void *vvar;
     virtual_ip_t *vip = NULL;
-    switch_status_t status;
 
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
-                                                      hi = switch_hash_next(hi))
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
+         hi; hi = switch_hash_next(hi))
     {
 
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
-        if (vip->running) {
-            int result;
-            vip->running = 0;
-            switch_thread_join(&status, vip->virtual_ip_thread);
-
+        if (vip_is_running(vip))
             virtual_ip_stop(vip);
-
-            result = cpg_leave(vip->handle, &vip->group_name);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                 "Leave  result is %d (should be 1)\n", result);
-            switch_yield(10000);
-            result = cpg_finalize (vip->handle);
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                              "Finalize  result is %d (should be 1)\n", result);
-        }
     }
     return SWITCH_STATUS_SUCCESS;
 }
@@ -168,38 +154,36 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
     if (!strcasecmp(argv[1], "start")) {
 
         if (vip != NULL) {
-            if (!vip->running) {
-
+            if (!vip_is_running(vip)) {
                 virtual_ip_start(vip);
-                //FIXME okkio che non voglio esporre sti flag.. 
-                //TODO cmq dovrei separare quelli di runtime da quelli di conf
-                vip->autoload = SWITCH_TRUE;
-                /*se lo accendo metto l'autoload così riparte se c'è una riconnessione*/
+
                 stream->write_function(stream, "starting %s\n", argv[0]);
             } else {
                 stream->write_function(stream,
-                                       "Profile %s already running\n", argv[0]);
+                                       "Profile %s already"
+                                       " running\n", argv[0]);
             }
         } else {
             stream->write_function(stream,
-                             "Failure starting %s, invalid profile\n", argv[0]);
+                             "Failure starting %s, invalid"
+                             " profile\n", argv[0]);
         }
         goto done;
     }
     if (!strcasecmp(argv[1], "stop")) {
 
         if (vip != NULL) {
-            if (vip->running) {
+            if (vip_is_running(vip)) {
                 stream->write_function(stream, "stopping %s\n", argv[0]);
 
-                stop_virtual_ips();
+                virtual_ip_stop(vip);
             } else {
                 stream->write_function(stream,
-                                           "Profile %s not running\n", argv[0]);
+                                       "Profile %s not running\n", argv[0]);
             }
         } else {
-            stream->write_function(stream,
-                             "Failure stopping %s, invalid profile\n", argv[0]);
+            stream->write_function(stream, "Failure stopping %s, "
+                                   "invalid profile\n", argv[0]);
         }
         goto done;
     }
@@ -285,14 +269,14 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
                                     event_handler, NULL,
                                     &globals.node) != SWITCH_STATUS_SUCCESS) {
 
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                                                            "Couldn't bind!\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, 
+                          SWITCH_LOG_ERROR, "Couldn't bind!\n");
         return SWITCH_STATUS_TERM;
     }
 
     globals.running = 1;
 
-    start_profiles();
+    //start_profiles();
 
     SWITCH_ADD_API(api_interface, "cpg", "cpg API", cpg_function, "syntax");
     switch_console_set_complete("add cpg help");
@@ -327,7 +311,7 @@ switch_status_t profiles_state_notification()
 
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
-        if (vip->running) {
+        if (vip_is_running(vip)) {
 
             virtual_ip_send_state(vip);
 
@@ -360,30 +344,30 @@ void event_handler(switch_event_t *event)
 
 
 
-SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
-{
-    char cmd[128];
+/*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)*/
+/*{*/
+/*    char cmd[128];*/
 
-    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");
-    globals.is_connected = SWITCH_TRUE;
+/*    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);*/
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);*/
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");*/
+/*    globals.is_connected = SWITCH_TRUE;*/
 
-    while(globals.running) {
+/*    while(globals.running) {*/
 
-        if (system(cmd) != 0) {
-            globals.is_connected = SWITCH_FALSE;
-            stop_virtual_ips();
-        } else { //è andato a buon fine
-            if (globals.is_connected == SWITCH_FALSE) { //se ero standby divento init
-                globals.is_connected = SWITCH_TRUE;
-                start_profiles();
-            }
-        }
+/*        if (system(cmd) != 0) {*/
+/*            globals.is_connected = SWITCH_FALSE;*/
+/*            stop_virtual_ips();*/
+/*        } else { //è andato a buon fine*/
+/*            if (globals.is_connected == SWITCH_FALSE) { //se ero standby divento init*/
+/*                globals.is_connected = SWITCH_TRUE;*/
+/*                start_profiles();*/
+/*            }*/
+/*        }*/
 
-        switch_yield(5000000);
+/*        switch_yield(5000000);*/
 
-    }
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime terminated\n");
-    return SWITCH_STATUS_TERM;
-}
+/*    }*/
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime terminated\n");*/
+/*    return SWITCH_STATUS_TERM;*/
+/*}*/

@@ -78,12 +78,18 @@ switch_status_t
 
     switch(fsm_get_state(vip)) {
         case ST_START:
-            if ((nm->priority == vip->priority)
-             && (nodeid != vip->node_id)) {
+            // se sono solo il master è sicuramente giù
+            if (vip->member_list_entries == 1) {
+                new_event = EVT_MASTER_DOWN;
+            }
+            // cerco duplicati
+            else if ((nm->priority == vip->priority)
+                    && (nodeid != vip->node_id)) {
                 new_event = EVT_DUPLICATE;
             }
             // if the priority list is complete becomes BACKUP
-            if (list_entries(vip->node_list) == vip->member_list_entries) {
+            else if (list_entries(vip->node_list)
+                    == vip->member_list_entries) {
                 new_event = EVT_MASTER_UP;
             }
             break;
@@ -97,7 +103,6 @@ switch_status_t
                 }
             }
             break;
-
         default: break;
     }
 

@@ -24,13 +24,13 @@
  */
 
 #include "cpg_utils.h"
+
 #include <net/if.h>
 #include <arpa/inet.h>
-
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
-
 #include "arpator.h"
+#include "mod_cpg.h"
 
 typedef enum {
     ADD_IP,
@@ -398,7 +398,7 @@ char * utils_node_pid_format(unsigned int nodeid) {
 #else
     saddr.s_addr = nodeid;
 #endif
-    sprintf(buffer, "node %s", inet_ntoa(saddr));
+    sprintf(buffer, "%s", inet_ntoa(saddr));
 
     return buffer;
 }
