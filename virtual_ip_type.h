@@ -56,7 +56,6 @@ typedef struct {
     switch_thread_t *virtual_ip_thread;
     switch_bool_t running;
     cpg_handle_t handle;
-    int members_number;
     uint32_t node_id;
     uint32_t master_id;
     char runtime_uuid[40];

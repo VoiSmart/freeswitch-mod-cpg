@@ -98,13 +98,22 @@ switch_status_t dup_warn(virtual_ip_t * vip){
 
 switch_status_t rollback(virtual_ip_t * vip)
 {
-    switch_status_t status = SWITCH_STATUS_FALSE;
+    switch_status_t status = SWITCH_STATUS_SUCCESS;
 
     if (vip->node_list->nodeid != vip->node_id) {
+        switch_thread_t *thread;
+        switch_threadattr_t *thd_attr = NULL;
+
         vip->rollback_node_id = vip->node_list->nodeid;
-        //TODO status = launch_rollback_thread(vip)
         vip->state = ST_RBACK;
-        status = SWITCH_STATUS_SUCCESS;
+
+
+        switch_threadattr_create(&thd_attr, globals.pool);
+        switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
+        switch_threadattr_priority_increase(thd_attr);
+        status = switch_thread_create(&thread, thd_attr,
+                                      rollback_thread, vip, globals.pool);
+
     }
     return status;
 }
@@ -188,13 +197,14 @@ switch_status_t go_down(virtual_ip_t *vip)
     vip->master_id = 0;
     vip->member_list_entries = 0;
     vip->running = SWITCH_FALSE;
-    vip->members_number = 0;
     vip->node_id = 0;
     vip->master_id = 0;
     vip->rollback_node_id = 0;
 
     node_remove_all(vip->node_list);
-
+    if (vip->node_list) {
+        vip->node_list = NULL;
+    }
 //    if profile_thread allora aspetta
 //    if rollback_thread allora aspetta
 
@@ -214,8 +224,14 @@ switch_status_t observe(virtual_ip_t *vip)
 
 switch_status_t go_up(virtual_ip_t *vip)
 {
+    switch_threadattr_t *thd_attr = NULL;
     vip->state = ST_START;
-    //TODO fai partire il thread
+
+    switch_threadattr_create(&thd_attr, globals.pool);
+    switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
+    switch_threadattr_priority_increase(thd_attr);
+    switch_thread_create(&(vip->virtual_ip_thread),
+                         thd_attr, vip_thread, vip, globals.pool);
     // start sofia profile?
     return SWITCH_STATUS_SUCCESS;
 }

@@ -11,9 +11,6 @@ master_up   START   BACKUP      dopo essersi fatto lo schema dei nodi, capisce
 
 STOP        tutti   IDLE        spegne i thread e fa la join
 
-controlla chi diavolo deve mandare il send state
-controlla bene se il backupup serve davvero? e il send_state? mi sa che mando
-lo stato da fuori...
 
 error deve incazzarsi di più
 

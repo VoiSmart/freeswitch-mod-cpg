@@ -39,4 +39,9 @@ switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 char *virtual_ip_get_state(virtual_ip_t *vip);
 virtual_ip_t *find_virtual_ip(char *address);
 
+/*private*/
+void
+    *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj);
+void
+    *SWITCH_THREAD_FUNC rollback_thread(switch_thread_t *thread, void *obj);
 #endif
