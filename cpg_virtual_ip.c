@@ -114,9 +114,7 @@ void
 *SWITCH_THREAD_FUNC rollback_thread(switch_thread_t *thread, void *obj)
 {
     virtual_ip_t *vip = (virtual_ip_t *) obj;
-    int result;
     uint32_t local_id;
-    switch_status_t status;
 
     local_id = vip->rollback_node_id;
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
@@ -125,22 +123,28 @@ void
 
     for (int i = 0;i < vip->rollback_delay * 60; i++) {
         switch_yield(1000000);
-        if ( vip->rollback_node_id != local_id) {
-             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                               "Rollback node for %s changed!\n",
-                               vip->address);
-             vip->rollback_node_id = 0;
-             return NULL;
-        }
+        if (vip->state != ST_RBACK)
+            goto stop_rollback;
 
-        if (utils_count_profile_channels(vip->address) == 0) {
-             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                               "0 calls for %s!Rollback!\n", vip->address);
+/*        if ( vip->rollback_node_id != local_id) {*/
+/*             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,*/
+/*                               "Rollback node for %s changed!\n",*/
+/*                               vip->address);*/
+/*             vip->rollback_node_id = 0;*/
+/*             goto stop_rollback;*/
+/*        }*/
 
-             break;
-        }
+/*        if (utils_count_profile_channels(vip->address) == 0) {*/
+/*             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,*/
+/*                            "0 calls for %s!Rollback!\n", vip->address);*/
+/*             break;*/
+/*        }*/
     }
+/*rollback:*/
     fsm_input_cmd_stop(vip);
+    return NULL;
+
+stop_rollback:
     return NULL;
 }
 

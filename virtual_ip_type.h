@@ -60,6 +60,7 @@ typedef struct {
     uint32_t master_id;
     char runtime_uuid[40];
     uint32_t rollback_node_id;
+    switch_thread_t *rollback_thread;
     node_t *node_list;
     size_t member_list_entries;
 } virtual_ip_t;

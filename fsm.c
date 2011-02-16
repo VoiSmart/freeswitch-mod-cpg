@@ -49,8 +49,8 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 { error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
 { error      , react      , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
-{ error      , noop       , noop       , noop       , rollbackCK },/*EVT_BACKUP_DOWN*/
-{ error      , error      , error      , rollback   , rollbackUP },/*EVT_RBACK_REQ*/
+{ error      , noop       , noop       , noop       , noop       },/*EVT_BACKUP_DOWN*/
+{ error      , error      , error      , rollback   , noop       },/*EVT_RBACK_REQ*/
 { error      , go_down    , go_down    , go_down    , go_down    } /*EVT_STOP*/
 
 };
@@ -101,23 +101,21 @@ switch_status_t rollback(virtual_ip_t * vip)
     switch_status_t status = SWITCH_STATUS_SUCCESS;
 
     if (vip->node_list->nodeid != vip->node_id) {
-        switch_thread_t *thread;
         switch_threadattr_t *thd_attr = NULL;
 
         vip->rollback_node_id = vip->node_list->nodeid;
         vip->state = ST_RBACK;
 
-
         switch_threadattr_create(&thd_attr, globals.pool);
         switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
         switch_threadattr_priority_increase(thd_attr);
-        status = switch_thread_create(&thread, thd_attr,
+        status = switch_thread_create(&(vip->rollback_thread), thd_attr,
                                       rollback_thread, vip, globals.pool);
 
     }
     return status;
 }
-
+//TODO
 switch_status_t rollbackUP(virtual_ip_t * vip)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
@@ -131,7 +129,7 @@ switch_status_t rollbackUP(virtual_ip_t * vip)
     }
     return status;
 }
-
+//TODO
 switch_status_t rollbackCK(virtual_ip_t * vip)
 {
     if (node_search(vip->node_list, vip->rollback_node_id) == NULL) {
@@ -185,14 +183,14 @@ switch_status_t react(virtual_ip_t *vip)
 error:
     switch_log_printf(SWITCH_CHANNEL_LOG, 
                       SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
-    //TODO chiamare shutdown direttamente?
-    vip->state = ST_IDLE;
+    go_down(vip);
     return SWITCH_STATUS_FALSE;
 
 }
 
 switch_status_t go_down(virtual_ip_t *vip)
 {
+    switch_status_t status;
     vip->state = ST_IDLE;
     vip->master_id = 0;
     vip->member_list_entries = 0;
@@ -205,9 +203,15 @@ switch_status_t go_down(virtual_ip_t *vip)
     if (vip->node_list) {
         vip->node_list = NULL;
     }
-//    if profile_thread allora aspetta
-//    if rollback_thread allora aspetta
 
+    if (vip->rollback_thread) {
+        switch_thread_join(&status, vip->rollback_thread);
+        vip->rollback_thread = NULL;
+    }
+    if (vip->virtual_ip_thread) {
+        switch_thread_join(&status, vip->virtual_ip_thread);
+        vip->virtual_ip_thread = NULL;
+    }
     utils_remove_vip(vip->address, vip->device);
 
     //TODO stop sofia profile
