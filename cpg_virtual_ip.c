@@ -254,7 +254,8 @@ void *SWITCH_THREAD_FUNC vip_thread_run(switch_thread_t *thread, void *obj)
         FD_SET (select_fd, &read_fds);
         result = select (select_fd + 1, &read_fds, 0, 0, &timeout);
         if (result == -1) {
-            printf ("select %d\n",result);
+            switch_log_printf(SWITCH_CHANNEL_LOG,
+                              SWITCH_LOG_ERROR, "select failed %d\n",result);
         }
 
         if (FD_ISSET (select_fd, &read_fds)) {
