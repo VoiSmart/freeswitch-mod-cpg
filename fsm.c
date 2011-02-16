@@ -24,7 +24,6 @@
  */
 #include "fsm.h"
 
-#include <switch.h>
 #include "cpg_utils.h"
 #include "cpg_virtual_ip.h"
 #include "mod_cpg.h"
