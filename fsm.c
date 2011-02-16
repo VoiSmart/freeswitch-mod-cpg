@@ -22,15 +22,15 @@
  * Phone : +39.02.70633354
  *
  */
-#include "cpg_actions.h"
+#include "fsm.h"
 
 #include <switch.h>
 #include "cpg_utils.h"
 #include "cpg_virtual_ip.h"
 
 /*actions definitions*/
-switch_status_t STR_Mdown(virtual_ip_t *vip);
-switch_status_t B_Mdown(virtual_ip_t *vip);
+switch_status_t reaction(virtual_ip_t *vip);
+switch_status_t go_down(virtual_ip_t *vip);
 switch_status_t send_state(virtual_ip_t *vip);
 
 switch_status_t noop(virtual_ip_t *vip);
@@ -40,17 +40,19 @@ switch_status_t dup_error(virtual_ip_t * vip);
 switch_status_t M_rb_req(virtual_ip_t * vip);
 switch_status_t RB_rb_req(virtual_ip_t * vip);
 
+switch_status_t BLAH(virtual_ip_t * vip);
+
 /*actions lookup table*/
 action_t table[MAX_EVENTS][MAX_STATES] = {
-/*ST_INIT    ,ST_START    ,ST_BACKUP   ,ST_MASTER   ,ST_RBACK    ,ST_STOP    */
-{            ,            ,            ,            ,            ,            },/*EVT_START*/
-{ dup_err    , dup_warn   , dup_warn   , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
-{            , STR_Mdown  , B_Mdown    ,            ,            ,            },/*EVT_MASTER_DOWN*/
-{            ,            ,            ,            ,            ,            },/*EVT_MASTER_UP*/
-{ noop       , noop       , noop       , noop       , noop       , noop       },/*EVT_BACKUP_DOWN*/
-{            ,            ,            ,            ,            ,            },/*EVT_BACKUP_UP*/
-{ error      , error      , error      , M_rb_req   , RB_rb_req  , error      },/*EVT_RBACK_REQ*/
-{            ,            ,            ,            ,            ,            } /*EVT_STOP*/
+/*ST_IDLE    ,ST_START    ,ST_BACKUP   ,ST_MASTER   ,ST_RBACK   */
+{ BLAH       , error      , error      , error      , error      },/*EVT_START*/
+{ error      , dup_error  , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
+{ error      , reaction   , reaction   , error      , error      },/*EVT_MASTER_DOWN*/
+{ error      , BLAH       , error      , error      , error      },/*EVT_MASTER_UP*/
+{ error      , noop       , noop       , noop       , noop       },/*EVT_BACKUP_DOWN*/
+{ error      , BLAH       , BLAH       , BLAH       , BLAH       },/*EVT_BACKUP_UP*/
+{ error      , error      , error      , M_rb_req   , RB_rb_req  },/*EVT_RBACK_REQ*/
+{ error      , go_down    , go_down    , go_down    , go_down    } /*EVT_STOP*/
 
 };
 
@@ -58,7 +60,7 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 // ST_RBACK EVT_BACKUP_DOWN
 
 /*actions chooser*/
-action_t fsm_do_transaction(state_t state, event_t event) {
+action_t fsm_do_transaction(event_t event, state_t state) {
 
     if (((event < 0) || (event >= MAX_EVENTS))
      || ((state < 0) || (state >= MAX_STATES))) {
@@ -69,21 +71,23 @@ action_t fsm_do_transaction(state_t state, event_t event) {
 }
 
 /*state getter*/
-state_t get_state(virtual_ip_t *vip) {
-    return vip->state?vip->state:NULL;
+state_t fsm_get_state(virtual_ip_t *vip) {
+    return vip->state;
 }
 
 /*##########################################################################*/
 /*actions implementations*/
 
 switch_status_t noop(virtual_ip_t * vip) {
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,"%s: NOOP\n", vip->address);
+    switch_log_printf(SWITCH_CHANNEL_LOG, 
+                      SWITCH_LOG_INFO,"%s: NOOP\n", vip->address);
     return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t error(virtual_ip_t * vip) {
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"%s: ERROR\n", vip->address);
-    return SWITCH_STATUS_SUCCESS;
+    switch_log_printf(SWITCH_CHANNEL_LOG,
+                      SWITCH_LOG_ERROR,"%s: ERROR\n", vip->address);
+    return SWITCH_STATUS_FALSE;
 }
 
 switch_status_t dup_warn(virtual_ip_t * vip){
@@ -113,7 +117,7 @@ switch_status_t Mrback_req(virtual_ip_t * vip){
 switch_status_t RBrback_req(virtual_ip_t * vip){
     switch_status_t status = SWITCH_STATUS_FALSE;
 
-    if (vip->node_list->nodeid != vip->node_id) &&
+    if ((vip->node_list->nodeid != vip->node_id) &&
        (vip->node_list->nodeid != vip->rollback_node_id)) {
 
         vip->rollback_node_id = vip->node_list->nodeid;
@@ -123,12 +127,12 @@ switch_status_t RBrback_req(virtual_ip_t * vip){
     return status;
 }
 
-switch_status_t B_Mdown(virtual_ip_t *vip)
+switch_status_t reaction(virtual_ip_t *vip)
 {
     // if I'm the first in priority list
     if ( vip->node_list->nodeid == vip->node_id) {
         // become master
-        vip->state = MASTER;
+        vip->state = ST_MASTER;
 
         // set the ip to bind to
         if (utils_add_vip(vip->address, vip->device) != SWITCH_STATUS_SUCCESS) {
@@ -161,40 +165,16 @@ switch_status_t B_Mdown(virtual_ip_t *vip)
 
 /*        utils_send_track_event(sql, vip->address);*/
 /*        switch_safe_free(sql);*/
-/*    }*/
+    }
     return SWITCH_STATUS_SUCCESS;
 
 error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
-    vip->state = STANDBY;
+    switch_log_printf(SWITCH_CHANNEL_LOG, 
+                      SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
+    //TODO chiamare shutdown direttamente?
+    vip->state = ST_IDLE;
     return SWITCH_STATUS_FALSE;
 
-}
-
-
-switch_status_t START_Mdown(virtual_ip_t *vip)
-{
-    // I'm the master
-    vip->state = MASTER;
-
-    // set the ip to bind to
-    if (utils_add_vip(vip->virtual_ip, vip->device) != SWITCH_STATUS_SUCCESS) {
-        goto error;
-    }
-
-    // gratuitous arp request
-    if (utils_send_gARP(vip->mac, vip->virtual_ip, vip->device) != SWITCH_STATUS_SUCCESS) {
-        utils_remove_vip(vip->virtual_ip, vip->device);
-        goto error;
-    }
-
-    virtual_ip_send_state(vip);
-    return SWITCH_STATUS_SUCCESS;
-
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
-    vip->state = STOP;
-    return SWITCH_STATUS_FALSE;
 }
 
 
@@ -204,9 +184,9 @@ switch_status_t send_state(virtual_ip_t *vip)
 }
 
 
-switch_status_t shutdown(virtual_ip_t *vip)
+switch_status_t godown(virtual_ip_t *vip)
 {
-    vip->state = STANDBY;
+    vip->state = ST_IDLE;
     vip->master_id = 0;
     vip->member_list_entries = 0;
     vip->running = SWITCH_FALSE;
@@ -214,16 +194,15 @@ switch_status_t shutdown(virtual_ip_t *vip)
     vip->node_id = 0;
     vip->master_id = 0;
     vip->rollback_node_id = 0;
-    size_t member_list_entries;
 //    node_t *node_list;remove all?
 
 //    if profile_thread allora aspetta
 //    if rollback_thread allora aspetta
 
-    utils_remove_vip(vip->virtual_ip, vip->device);
+    utils_remove_vip(vip->address, vip->device);
 
-    // stop sofia profile, I don't check errors
-    utils_stop_sofia_profile(vip->name);
+    //TODO stop sofia profile, I don't check errors
+/*    utils_stop_sofia_profile(vip->name);*/
 
     return SWITCH_STATUS_SUCCESS;
 
@@ -239,8 +218,8 @@ switch_status_t shutdown(virtual_ip_t *vip)
 
 
 
-switch_status_t from_standby_to_init(virtual_ip_t *vip)
-{
+/*switch_status_t from_standby_to_init(virtual_ip_t *vip)*/
+/*{*/
 /*    vip->state = INIT;*/
 
 /*    // start sofia profile*/
@@ -257,61 +236,61 @@ switch_status_t from_standby_to_init(virtual_ip_t *vip)
 /*error:*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to INIT!\n");*/
 /*    vip->state = STANDBY;*/
-    return SWITCH_STATUS_FALSE;
+/*    return SWITCH_STATUS_FALSE;*/
 
-}
+/*}*/
 
-switch_status_t from_init_to_backup(virtual_ip_t *vip)
-{
+/*switch_status_t from_init_to_backup(virtual_ip_t *vip)*/
+/*{*/
 /*    vip->state = BACKUP;*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From INIT to BACKUP for %s!\n", vip->name);*/
-    return SWITCH_STATUS_SUCCESS;
-}
+/*    return SWITCH_STATUS_SUCCESS;*/
+/*}*/
 
 
-switch_status_t from_master_to_standby(virtual_ip_t *vip)
-{
-    vip->state = STANDBY;
-    vip->master_id = 0;
-    vip->member_list_entries = 0;
-    if (utils_remove_vip(vip->virtual_ip, vip->device) != SWITCH_STATUS_SUCCESS) {
-        goto error;
-    }
+/*switch_status_t from_master_to_standby(virtual_ip_t *vip)*/
+/*{*/
+/*    vip->state = STANDBY;*/
+/*    vip->master_id = 0;*/
+/*    vip->member_list_entries = 0;*/
+/*    if (utils_remove_vip(vip->virtual_ip, vip->device) != SWITCH_STATUS_SUCCESS) {*/
+/*        goto error;*/
+/*    }*/
 
-    // stop sofia profile
-    if (utils_stop_sofia_profile(vip->name) != SWITCH_STATUS_SUCCESS){
-        goto error;
-    }
+/*    // stop sofia profile*/
+/*    if (utils_stop_sofia_profile(vip->name) != SWITCH_STATUS_SUCCESS){*/
+/*        goto error;*/
+/*    }*/
 
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From MASTER to STANDBY for %s!\n", vip->name);
-    return SWITCH_STATUS_SUCCESS;
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From MASTER to STANDBY for %s!\n", vip->name);*/
+/*    return SWITCH_STATUS_SUCCESS;*/
 
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
-    return SWITCH_STATUS_FALSE;
-}
+/*error:*/
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");*/
+/*    return SWITCH_STATUS_FALSE;*/
+/*}*/
 
-switch_status_t from_backup_to_standby(virtual_ip_t *vip)
-{
-    vip->state = STANDBY;
-    vip->master_id = 0;
-    vip->member_list_entries = 0;
+/*switch_status_t from_backup_to_standby(virtual_ip_t *vip)*/
+/*{*/
+/*    vip->state = STANDBY;*/
+/*    vip->master_id = 0;*/
+/*    vip->member_list_entries = 0;*/
 
-    // stop sofia profile
-    if (utils_stop_sofia_profile(vip->name) != SWITCH_STATUS_SUCCESS){
-        goto error;
-    }
+/*    // stop sofia profile*/
+/*    if (utils_stop_sofia_profile(vip->name) != SWITCH_STATUS_SUCCESS){*/
+/*        goto error;*/
+/*    }*/
 
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to STANDBY for %s!\n", vip->name);
-    return SWITCH_STATUS_SUCCESS;
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"From BACKUP to STANDBY for %s!\n", vip->name);*/
+/*    return SWITCH_STATUS_SUCCESS;*/
 
-error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");
-    return SWITCH_STATUS_FALSE;
-}
+/*error:*/
+/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");*/
+/*    return SWITCH_STATUS_FALSE;*/
+/*}*/
 
-switch_status_t from_init_to_standby(virtual_ip_t *vip)
-{
+/*switch_status_t from_init_to_standby(virtual_ip_t *vip)*/
+/*{*/
 /*    vip->state = STANDBY;*/
 /*    vip->master_id = 0;*/
 /*    vip->member_list_entries = 0;*/
@@ -326,29 +305,6 @@ switch_status_t from_init_to_standby(virtual_ip_t *vip)
 
 /*error:*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Failed transition to STANDBY!\n");*/
-    return SWITCH_STATUS_FALSE;
-}
-
-/*switch_status_t go_to_standby(virtual_ip_t *vip)*/
-/*{*/
-/*    switch_status_t status = SWITCH_STATUS_FALSE;*/
-
-/*    if (!vip)*/
-/*        return status;*/
-
-/*    switch(vip->state) {*/
-/*        case MASTER:*/
-/*            status = from_master_to_standby(vip);*/
-/*            break;*/
-/*        case BACKUP:*/
-/*            status = from_backup_to_standby(vip);*/
-/*            break;*/
-/*        case INIT:*/
-/*            status = from_init_to_standby(vip);*/
-/*            break;*/
-/*        case STANDBY:*/
-/*            status = SWITCH_STATUS_SUCCESS;*/
-/*            break;*/
-/*    }*/
-/*    return status;*/
+/*    return SWITCH_STATUS_FALSE;*/
 /*}*/
+

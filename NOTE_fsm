@@ -1,0 +1,27 @@
+evento      statoIn statoOUT    descrizione
+
+start       IDLE    START       può essere processato solo da init, serve per far 
+                                partire il thread, eventualmente fa partire
+                                i profili sofia
+                                negli altri casi è errore
+
+master_up   START   BACKUP      dopo essersi fatto lo schema dei nodi, capisce 
+                                che è un backup
+                                negli altri casi è error
+
+STOP        tutti   STOP        spegne i thread e fa la join
+
+/*actions lookup table*/
+action_t table[MAX_EVENTS][MAX_STATES] = {
+/*ST_IDLE    ,ST_START    ,ST_BACKUP   ,ST_MASTER   ,ST_RBACK    ,ST_STOP    */
+{            , error      , error      , error      , error      , error      },/*EVT_START*/
+{ error      , dup_err    , dup_warn   , dup_warn   , dup_warn   , error      },/*EVT_DULICATE*/
+{ error      , reaction   , reaction   , error      , error      , error      },/*EVT_MASTER_DOWN*/
+{ error      ,            , error      , error      , error      , error      },/*EVT_MASTER_UP*/
+{ error      , noop       , noop       , noop       , noop       , error      },/*EVT_BACKUP_DOWN*/
+{ error      ,            ,            ,            ,            , error      },/*EVT_BACKUP_UP*/
+{ error      , error      , error      , M_rb_req   , RB_rb_req  , error      },/*EVT_RBACK_REQ*/
+{ error      ,            ,            ,            ,            , error      },/*EVT_STOP*/
+{ error      ,            ,            ,            ,            ,            } /*EVT_CLEARALL*/
+
+};

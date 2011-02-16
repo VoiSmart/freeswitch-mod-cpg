@@ -26,21 +26,25 @@
 
 #include "fsm.h"
 
-switch_status_t fsm_input_node_up(virtual_ip_t vip, size_t member_list_entries)
+switch_status_t
+    fsm_input_node_up(virtual_ip_t *vip, size_t member_list_entries)
 {
+    switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = EVT_BACKUP_UP;
 
-    if (member_list_entries == 1)
-    && (fsm_get_state(vip) == ST_INIT) {
+    if ((member_list_entries == 1)
+    && (fsm_get_state(vip) == ST_START)) {
         // I'm the master
         new_event = EVT_MASTER_DOWN;
     }
 
-    return do_transaction(new_event, vip->state)(vip);
+    status = fsm_do_transaction(new_event, vip->state) (vip);
+    return status;
 }
 
-switch_Status_t fsm_input_node_down(virtual_ip_t vip, uint32_t nodeid)
+switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
 {
+    switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = EVT_BACKUP_DOWN;
 
     if ( vip->master_id == nodeid) {
@@ -48,15 +52,15 @@ switch_Status_t fsm_input_node_down(virtual_ip_t vip, uint32_t nodeid)
     }
     vip->node_list = node_remove(vip->node_list, nodeid);
 
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                      "i = %d, nodeid = %u\n",i,nodeid);
+    switch_log_printf(SWITCH_CHANNEL_LOG,
+                      SWITCH_LOG_NOTICE, "nodeid = %u\n",nodeid);
 
-    return do_transaction(new_event, vip->state)(vip);
-
+    status = fsm_do_transaction(new_event, vip->state) (vip);
+    return status;
 }
 
 
-switch_status_t fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm)
+switch_status_t fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm, uint32_t nodeid)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = MAX_EVENTS;//nullo
@@ -66,22 +70,24 @@ switch_status_t fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm)
 
     if (nm->state == ST_MASTER) {
         vip->master_id = nodeid;
-        switch_snprintf(vip->runtime_uuid, sizeof(vip->runtime_uuid),"%s", nm->runtime_uuid );
+        switch_snprintf(vip->runtime_uuid,
+                        sizeof(vip->runtime_uuid),"%s", nm->runtime_uuid );
     }
 
     switch(fsm_get_state(vip)) {
-        case ST_INIT:
-            if ((nm->priority == vip->priority) && (nodeid != vip->node_id)) {
+        case ST_START:
+            if ((nm->priority == vip->priority)
+             && (nodeid != vip->node_id)) {
                 new_event = EVT_DUPLICATE;
             }
             // if the priority list is complete becomes BACKUP
-            if (list_entries(profile->node_list) == profile->member_list_entries) {
-                new_event = MASTER_UP;
+            if (list_entries(vip->node_list) == vip->member_list_entries) {
+                new_event = EVT_MASTER_UP;
             }
             break;
         case ST_MASTER:
         case ST_RBACK:
-            if (profile->node_list != NULL ) {
+            if (vip->node_list != NULL ) {
                 if ((vip->autorollback == SWITCH_TRUE) &&
                     nm->priority > vip->priority) {
 
@@ -94,11 +100,22 @@ switch_status_t fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm)
     }
 
     if (new_event != MAX_EVENTS) {
-        status = do_transaction(new_event, vip->state) (vip);
+        status = fsm_do_transaction(new_event, vip->state) (vip);
     }
     return status;
 }
 
-
-
-
+switch_status_t fsm_input_cmd_start(virtual_ip_t *vip)
+{
+    switch_status_t status = SWITCH_STATUS_FALSE;
+    event_t new_event = EVT_STARTUP;
+    status = fsm_do_transaction(new_event, vip->state) (vip);
+    return status;
+}
+switch_status_t fsm_input_cmd_stop(virtual_ip_t *vip)
+{
+    switch_status_t status = SWITCH_STATUS_FALSE;
+    event_t new_event = EVT_STOP;
+    status = fsm_do_transaction(new_event, vip->state) (vip);
+    return status;
+}

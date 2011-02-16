@@ -26,7 +26,6 @@
 #define CPG_VIRTUAL_IP_H
 
 #include <switch.h>
-#include <corosync/cpg.h>
 #include "node.h"
 #include "virtual_ip_type.h"
 

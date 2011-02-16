@@ -27,7 +27,9 @@
 #define MAX_SOFIA_PROFILE 8
 
 #include <switch.h>
+#include <corosync/cpg.h>
 #include "states_events.h"
+#include "node.h"
 
 typedef struct {
     char name[256];

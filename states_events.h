@@ -25,11 +25,13 @@
 #ifndef CPG_STATES_EVENTS_H
 #define CPG_STATES_EVENTS_H
 typedef enum {
-    EVT_START,
+    EVT_STARTUP,
+    EVT_DUPLICATE,
     EVT_MASTER_DOWN,
     EVT_MASTER_UP,
     EVT_BACKUP_DOWN,
     EVT_BACKUP_UP,
+    EVT_RBACK_REQ,
     EVT_STOP,
     MAX_EVENTS
 } event_t;
@@ -40,7 +42,6 @@ typedef enum {
     ST_BACKUP,
     ST_MASTER,
     ST_RBACK,
-    ST_STOP,
     MAX_STATES
 } state_t;
 #endif

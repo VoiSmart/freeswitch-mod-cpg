@@ -29,10 +29,10 @@
 #include "states_events.h"
 #include "virtual_ip_type.h"
 
-typedef switch_status_t (*const action_t) (virtual_ip_t *vip);
+typedef switch_status_t (*action_t) (virtual_ip_t *vip);
 
 action_t fsm_do_transaction(event_t event, state_t state);
 
-state_t get_state(virtual_ip_t *vip);
+state_t fsm_get_state(virtual_ip_t *vip);
 
 #endif
