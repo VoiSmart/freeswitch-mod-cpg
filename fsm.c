@@ -35,14 +35,12 @@ switch_status_t go_up(virtual_ip_t *vip);
 switch_status_t observe(virtual_ip_t *vip);
 switch_status_t rollback(virtual_ip_t * vip);
 switch_status_t rollbackUP(virtual_ip_t * vip);
-
-switch_status_t send_state(virtual_ip_t *vip);
+switch_status_t rollbackCK(virtual_ip_t * vip);
 
 switch_status_t noop(virtual_ip_t *vip);
 switch_status_t error(virtual_ip_t *vip);
 switch_status_t dup_warn(virtual_ip_t * vip);
 
-switch_status_t BLAH(virtual_ip_t * vip);
 
 /*actions lookup table*/
 action_t table[MAX_EVENTS][MAX_STATES] = {
@@ -51,8 +49,7 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 { error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
 { error      , react      , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
-{ error      , noop       , noop       , noop       , BLAH       },/*EVT_BACKUP_DOWN*/
-{ error      , BLAH       , BLAH       , BLAH       , BLAH       },/*EVT_BACKUP_UP*/
+{ error      , noop       , noop       , noop       , rollbackCK },/*EVT_BACKUP_DOWN*/
 { error      , error      , error      , rollback   , rollbackUP },/*EVT_RBACK_REQ*/
 { error      , go_down    , go_down    , go_down    , go_down    } /*EVT_STOP*/
 
@@ -112,7 +109,7 @@ switch_status_t rollback(virtual_ip_t * vip)
     return status;
 }
 
-switch_status_t rollback_update(virtual_ip_t * vip)
+switch_status_t rollbackUP(virtual_ip_t * vip)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
 
@@ -126,7 +123,16 @@ switch_status_t rollback_update(virtual_ip_t * vip)
     return status;
 }
 
-switch_status_t reaction(virtual_ip_t *vip)
+switch_status_t rollbackCK(virtual_ip_t * vip)
+{
+    if (node_search(vip->node_list, vip->rollback_node_id) == NULL) {
+        //stoppa il thread del rollback
+        //join
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t react(virtual_ip_t *vip)
 {
     // if I'm the first in priority list
     if ( vip->node_list->nodeid == vip->node_id) {
@@ -176,13 +182,6 @@ error:
 
 }
 
-
-switch_status_t send_state(virtual_ip_t *vip)
-{
-    return virtual_ip_send_state(vip);
-}
-
-
 switch_status_t go_down(virtual_ip_t *vip)
 {
     vip->state = ST_IDLE;
@@ -201,8 +200,7 @@ switch_status_t go_down(virtual_ip_t *vip)
 
     utils_remove_vip(vip->address, vip->device);
 
-    //TODO stop sofia profile, I don't check errors
-/*    utils_stop_sofia_profile(vip->name);*/
+    //TODO stop sofia profile
 
     return SWITCH_STATUS_SUCCESS;
 
@@ -218,6 +216,8 @@ switch_status_t go_up(virtual_ip_t *vip)
 {
     vip->state = ST_START;
     //TODO fai partire il thread
-/*    // start sofia profile?*/
+    // start sofia profile?
     return SWITCH_STATUS_SUCCESS;
 }
+
+

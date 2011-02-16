@@ -30,7 +30,7 @@ switch_status_t
     fsm_input_node_up(virtual_ip_t *vip, size_t member_list_entries)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
-    event_t new_event = EVT_BACKUP_UP;
+    event_t new_event = MAX_EVENTS;
 
     if ((member_list_entries == 1)
     && (fsm_get_state(vip) == ST_START)) {
@@ -39,7 +39,7 @@ switch_status_t
     }
 
     status = fsm_do_transaction(new_event, vip->state) (vip);
-    return status;
+    return (new_event == MAX_EVENTS)? SWITCH_STATUS_SUCCESS:status;
 }
 
 switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
@@ -60,7 +60,9 @@ switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
 }
 
 
-switch_status_t fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm, uint32_t nodeid)
+switch_status_t
+    fsm_input_new_state_message(virtual_ip_t *vip,
+                                node_msg_t *nm, uint32_t nodeid)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = MAX_EVENTS;//nullo

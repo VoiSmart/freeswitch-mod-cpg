@@ -30,7 +30,6 @@ typedef enum {
     EVT_MASTER_DOWN,
     EVT_MASTER_UP,
     EVT_BACKUP_DOWN,
-    EVT_BACKUP_UP,
     EVT_RBACK_REQ,
     EVT_STOP,
     MAX_EVENTS

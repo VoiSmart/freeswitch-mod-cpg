@@ -32,7 +32,8 @@
 switch_status_t
     fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid);
 switch_status_t
-    fsm_input_new_state_message(virtual_ip_t *vip, node_msg_t *nm, uint32_t nodeid);
+    fsm_input_new_state_message(virtual_ip_t *vip,
+                                node_msg_t *nm, uint32_t nodeid);
 switch_status_t
     fsm_input_node_up(virtual_ip_t *vip, size_t member_list_entries);
 switch_status_t
