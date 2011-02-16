@@ -118,7 +118,6 @@ void
     uint32_t local_id;
     switch_status_t status;
 
-
     local_id = vip->rollback_node_id;
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                       "Rollback thread for %s started, waiting for %s!\n",
@@ -140,25 +139,8 @@ void
 
              break;
         }
-
     }
-    //TODO sta roba va messa nello stop
-    vip->rollback_node_id = 0;
-    vip->running = 0;
-    switch_thread_join(&status, vip->virtual_ip_thread);
-
     fsm_input_cmd_stop(vip);
-
-    //TODO pure sta qui
-    result = cpg_leave(vip->handle, &vip->group_name);
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "Leave  result is %d (should be 1)\n", result);
-    switch_yield(10000);
-    result = cpg_finalize (vip->handle);
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "Finalize  result is %d (should be 1)\n", result);
-    switch_yield(5000000);
-    virtual_ip_start(vip);
     return NULL;
 }
 
