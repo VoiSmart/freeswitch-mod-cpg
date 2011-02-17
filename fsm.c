@@ -144,7 +144,6 @@ switch_status_t react(virtual_ip_t *vip)
 {
     // if I'm the first in priority list
     if ( vip->node_id == node_first(vip->node_list)) {
-printf("react!\n");
         // become master
         vip->state = ST_MASTER;
 

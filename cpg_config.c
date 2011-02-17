@@ -85,7 +85,6 @@ switch_status_t do_config(char *cf)
                                                  param; param = param->next) {
             char *var = (char *) switch_xml_attr_soft(param, "name");
             char *val = (char *) switch_xml_attr_soft(param, "value");
-            printf("%s = %s\n", var, val);
 
             if (!strcmp(var, "device")) {
                 char *mac;
