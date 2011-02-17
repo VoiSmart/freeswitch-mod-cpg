@@ -88,8 +88,6 @@ switch_status_t noop(virtual_ip_t * vip) {
 }
 
 switch_status_t error(virtual_ip_t * vip) {
-    switch_log_printf(SWITCH_CHANNEL_LOG,
-                      SWITCH_LOG_ERROR,"%s: ERROR\n", vip->address);
     return SWITCH_STATUS_FALSE;
 }
 

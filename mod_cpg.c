@@ -97,7 +97,7 @@ printf("%d\n",vip->netmask);
     return SWITCH_STATUS_SUCCESS;
 }
 
-switch_status_t start_profiles()
+switch_status_t autostart_virtual_ips()
 {
     switch_hash_index_t *hi;
     void *val;
@@ -111,8 +111,6 @@ switch_status_t start_profiles()
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
         if (vip->autoload == SWITCH_TRUE) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                                                  "launch %s\n", vip->address);
             virtual_ip_start(vip);
         }
     }
@@ -129,23 +127,26 @@ switch_status_t stop_virtual_ips()
     for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
          hi; hi = switch_hash_next(hi))
     {
-
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
-        if (vip_is_running(vip))
-            virtual_ip_stop(vip);
+
+        virtual_ip_stop(vip);
     }
     return SWITCH_STATUS_SUCCESS;
 }
 
 
-switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream)
+switch_status_t cmd_vip(char **argv, int argc,switch_stream_handle_t *stream)
 {
 
     virtual_ip_t *vip = NULL;
     char *address = argv[0];
 
     vip = find_virtual_ip(address);
+    if (!vip) {
+        stream->write_function(stream, "Invalid profile %s\n", argv[0]);
+        return SWITCH_STATUS_SUCCESS;
+    }
 
     if (argc != 2) {
         stream->write_function(stream, "Invalid Args!\n");
@@ -154,45 +155,28 @@ switch_status_t cmd_profile(char **argv, int argc,switch_stream_handle_t *stream
 
     if (!strcasecmp(argv[1], "start")) {
 
-        if (vip != NULL) {
-            if (!vip_is_running(vip)) {
-                virtual_ip_start(vip);
-
-                stream->write_function(stream, "starting %s\n", argv[0]);
-            } else {
-                stream->write_function(stream,
-                                       "Profile %s already"
-                                       " running\n", argv[0]);
-            }
+        if (!virtual_ip_start(vip)) {
+            stream->write_function(stream, "starting %s\n", argv[0]);
         } else {
             stream->write_function(stream,
-                             "Failure starting %s, invalid"
-                             " profile\n", argv[0]);
+                                   "Profile %s already running\n", argv[0]);
         }
-        goto done;
+        return SWITCH_STATUS_SUCCESS;
     }
+
     if (!strcasecmp(argv[1], "stop")) {
 
-        if (vip != NULL) {
-            if (vip_is_running(vip)) {
-                stream->write_function(stream, "stopping %s\n", argv[0]);
-
-                virtual_ip_stop(vip);
-            } else {
-                stream->write_function(stream,
-                                       "Profile %s not running\n", argv[0]);
-            }
+        if (!virtual_ip_stop(vip)) {
+            stream->write_function(stream, "stopping %s\n", argv[0]);
         } else {
-            stream->write_function(stream, "Failure stopping %s, "
-                                   "invalid profile\n", argv[0]);
+            stream->write_function(stream,
+                                   "Profile %s not running\n", argv[0]);
         }
-        goto done;
+        return SWITCH_STATUS_SUCCESS;
     }
 
     stream->write_function(stream, "-ERR Unknown command!\n");
-
-    done:
-        return SWITCH_STATUS_SUCCESS;
+    return SWITCH_STATUS_SUCCESS;
 }
 
 
@@ -207,7 +191,7 @@ SWITCH_STANDARD_API(cpg_function)
         "--------------------------------------------------------------------------------\n"
         "cpg help\n"
         "cpg status\n"
-        "cpg profile profile_name start/stop\n"
+        "cpg vip address start/stop\n"
         "--------------------------------------------------------------------------------\n";
     switch_status_t status = SWITCH_STATUS_SUCCESS;
 
@@ -227,9 +211,9 @@ SWITCH_STANDARD_API(cpg_function)
         status = cmd_status(stream);
         goto done;
     }
-    if (!strcasecmp(argv[0], "profile")) {
+    if (!strcasecmp(argv[0], "vip")) {
         if (!zstr(argv[1])) {
-            status = cmd_profile(&argv[lead],argc - lead,stream);
+            status = cmd_vip(&argv[lead],argc - lead,stream);
         } else {
             stream->write_function(stream, "%s", usage_string);
         }
