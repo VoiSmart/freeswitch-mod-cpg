@@ -43,14 +43,18 @@ void event_handler(switch_event_t *event);
 switch_status_t map_vip(switch_status_t (*vip_func)(virtual_ip_t *vip));
 switch_status_t autostart_vip(virtual_ip_t *vip);
 
+static const char *line1 = "========================================"
+                           "========================================\n";
+static const char *line2 = "----------------------------------------"
+                           "----------------------------------------\n";
+
 switch_status_t cmd_status(switch_stream_handle_t *stream)
 {
     switch_hash_index_t *hi;
     void *val;
     const void *vvar;
     virtual_ip_t *vip = NULL;
-    const char *line1 = "================================================================================\n";
-    const char *line2 = "--------------------------------------------------------------------------------\n";
+
 
     stream->write_function(stream, "%25s\t%20s\t%10s\t\n%s",
                            "Virtual Ip", "Master Ip", "State", line1);
@@ -93,7 +97,7 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     return SWITCH_STATUS_SUCCESS;
 }
 
-switch_status_t cmd_vip(char **argv, int argc,switch_stream_handle_t *stream)
+switch_status_t cmd_vip(char **argv, int argc, switch_stream_handle_t *stream)
 {
 
     virtual_ip_t *vip = NULL;
