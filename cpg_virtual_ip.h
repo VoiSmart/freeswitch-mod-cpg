@@ -36,12 +36,12 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 
 /*local utils*/
-char *virtual_ip_get_state(virtual_ip_t *vip);
+const char *virtual_ip_get_state(virtual_ip_t *vip);
 virtual_ip_t *find_virtual_ip(char *address);
 switch_bool_t vip_is_running(virtual_ip_t *vip);
 
-char *state_to_string(state_t state);
-char *event_to_string(event_t state);
+const char *state_to_string(state_t state);
+const char *event_to_string(event_t state);
 
 /*private*/
 void

@@ -55,40 +55,42 @@ static void ConfchgCallback (
     const struct cpg_address *left_list, size_t left_list_entries,
     const struct cpg_address *joined_list, size_t joined_list_entries);
 
-
-
 static cpg_callbacks_t callbacks = {
     .cpg_deliver_fn = DeliverCallback,
     .cpg_confchg_fn = ConfchgCallback,
 };
 
+static const char *evt_names[MAX_EVENTS] = {
+    "STARTUP",
+    "DUPLICATE",
+    "MASTER_DOWN",
+    "MASTER_UP",
+    "BACKUP_DOWN",
+    "RBACK_REQ",
+    "STOP"
+};
+
+static const char *st_names[MAX_STATES] = {
+    "IDLE",
+    "START",
+    "BACKUP",
+    "MASTER",
+    "RBACK"
+};
+
 static switch_status_t send_message(cpg_handle_t h, void *buf, int len);
 
 
-char *event_to_string(event_t event)
+const char *event_to_string(event_t event)
 {
-    char *evt_names[MAX_EVENTS] = {
-        "STARTUP",
-        "DUPLICATE",
-        "MASTER_DOWN",
-        "MASTER_UP",
-        "BACKUP_DOWN",
-        "RBACK_REQ",
-        "STOP"
-    };
-    return strndup(evt_names[event],11);
+    if (event < 0 || event >= MAX_EVENTS) return "";
+    return evt_names[event];
 }
 
-char *state_to_string(state_t state)
+const char *state_to_string(state_t state)
 {
-    char *st_names[MAX_STATES] = {
-        "IDLE",
-        "START",
-        "BACKUP",
-        "MASTER",
-        "RBACK"
-    };
-    return strndup(st_names[state],10);
+    if (state<0 || state >= MAX_STATES) return "";
+    return st_names[state];
 }
 
 virtual_ip_t *find_virtual_ip(char *address)
@@ -102,7 +104,7 @@ virtual_ip_t *find_virtual_ip(char *address)
     return vip;
 }
 
-char *virtual_ip_get_state(virtual_ip_t *vip)
+const char *virtual_ip_get_state(virtual_ip_t *vip)
 {
     return state_to_string(vip->state);
 }
