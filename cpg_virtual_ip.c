@@ -135,29 +135,24 @@ void
     local_id = vip->rollback_node_id;
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                       "Rollback thread for %s started, waiting for %s!\n",
-                       vip->address, utils_node_pid_format(local_id));
+                       vip->config.address, utils_node_pid_format(local_id));
 
-    for (int i = 0;i < vip->rollback_delay * 60; i++) {
+    for (int i = 0;i < vip->config.rollback_delay * 60; i++) {
         switch_yield(1000000);
         if (vip->state != ST_RBACK)
             goto stop_rollback;
 
-/*        if ( vip->rollback_node_id != local_id) {*/
+/*        if (utils_count_profile_channels(vip->config.address) == 0) {*/
 /*             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,*/
-/*                               "Rollback node for %s changed!\n",*/
-/*                               vip->address);*/
-/*             vip->rollback_node_id = 0;*/
-/*             goto stop_rollback;*/
-/*        }*/
-
-/*        if (utils_count_profile_channels(vip->address) == 0) {*/
-/*             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,*/
-/*                            "0 calls for %s!Rollback!\n", vip->address);*/
+/*                            "0 calls for %s!Rollback!\n", vip->config.address);*/
 /*             break;*/
 /*        }*/
     }
 /*rollback:*/
     fsm_input_cmd_stop(vip);
+    switch_yield(1000000);
+    fsm_input_cmd_start(vip);
+    
     return NULL;
 
 stop_rollback:
@@ -182,7 +177,7 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
     int result;
 
     switch_log_printf(SWITCH_CHANNEL_LOG,
-                      SWITCH_LOG_DEBUG,"%s launch\n", vip->address);
+                      SWITCH_LOG_DEBUG,"%s launch\n", vip->config.address);
 
     result = cpg_initialize (&vip->handle, &callbacks);
     if (result != CS_OK) {
@@ -211,7 +206,7 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
                       "Local node id is %s\n",
                       utils_node_pid_format(vip->node_id));
 
-    result = cpg_join(vip->handle, &vip->group_name);
+    result = cpg_join(vip->handle, &vip->config.group_name);
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                           "Could not join process group, error %d\n", result);
@@ -238,9 +233,9 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
     //end
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "%s virtual_ip thread stopped\n",vip->address);
+                      "%s virtual_ip thread stopped\n",vip->config.address);
 leave:
-    result = cpg_leave(vip->handle, &vip->group_name);
+    result = cpg_leave(vip->handle, &vip->config.group_name);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                       "Leave  result is %d (should be 1)\n", result);
     switch_yield(10000);
@@ -277,7 +272,7 @@ static void DeliverCallback (
             if (vip->node_id != nodeid) {
                 char *sql;
                 sql = (char *)msg + sizeof(header_t);
-                utils_send_track_event(sql, vip->address);
+                utils_send_track_event(sql, vip->config.address);
 
                 switch_log_printf(SWITCH_CHANNEL_LOG,
                                   SWITCH_LOG_DEBUG,
@@ -398,7 +393,7 @@ switch_status_t virtual_ip_send_state(virtual_ip_t *vip)
 
     nm = ( node_msg_t *)(buf + sizeof(header_t));
     nm->state = vip->state;
-    nm->priority = vip->priority;
+    nm->priority = vip->config.priority;
     switch_snprintf(nm->runtime_uuid,
                     sizeof(nm->runtime_uuid), "%s", switch_core_get_uuid());
 

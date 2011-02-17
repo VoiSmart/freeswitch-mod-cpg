@@ -58,18 +58,19 @@ typedef struct {
 
 typedef struct {
 
-/*configuration*/
-    char address[16];
-    int netmask;
-    char device[10];
-    char mac[18];
-    struct cpg_name group_name;
-    int priority;
-    switch_bool_t autoload;
-    switch_bool_t autorollback;
-    int rollback_delay;
-    sofia_profile_t profiles[MAX_SOFIA_PROFILE];
-
+    /*configuration*/
+    struct {
+        char address[16];
+        int netmask;
+        char device[10];
+        char mac[18];
+        int priority;
+        struct cpg_name group_name;
+        switch_bool_t autoload;
+        switch_bool_t autorollback;
+        int rollback_delay;
+        sofia_profile_t profiles[MAX_SOFIA_PROFILE];
+    } config;
 /*runtime information*/
     state_t state;
     switch_thread_t *virtual_ip_thread;

@@ -235,7 +235,6 @@ void utils_reloadxml()
     return;
 }
 
-
 switch_status_t utils_start_sofia_profile(char *profile_name)
 {
     char cmd[128];
@@ -254,7 +253,9 @@ switch_status_t utils_start_sofia_profile(char *profile_name)
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot execute sofia api %s\n", profile_name);
             return SWITCH_STATUS_FALSE;
         }
+        printf("%s", (char *)mystream.data);
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s started\n", profile_name);
+        switch_safe_free(mystream.data);
         return SWITCH_STATUS_SUCCESS;
     } else {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid profile name\n");
@@ -279,6 +280,7 @@ switch_status_t utils_stop_sofia_profile(char *profile_name)
         }
 
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s stopped\n", profile_name);
+        switch_safe_free(mystream.data);
         return SWITCH_STATUS_SUCCESS;
     } else {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid profile name\n");
@@ -300,6 +302,7 @@ void utils_hupall(char *profile_name)
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot hupall for %s\n",profile_name);
         return;
     }
+    switch_safe_free(mystream.data);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"hupall for %s done\n",profile_name);
     return;
 }
@@ -317,7 +320,7 @@ switch_status_t utils_recover(char *profile_name)
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot recover profile %s\n", profile_name);
             return SWITCH_STATUS_FALSE;
         }
-
+        switch_safe_free(mystream.data);
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s recovered\n", profile_name);
         return SWITCH_STATUS_SUCCESS;
     } else {

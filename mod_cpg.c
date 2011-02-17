@@ -29,8 +29,6 @@
 #include "cpg_virtual_ip.h"
 
 
-
-
 /* Prototypes */
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown);
 
@@ -42,9 +40,8 @@ SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, NULL/*mod_cpg_
 
 
 void event_handler(switch_event_t *event);
-switch_status_t start_virtual_ips();
-switch_status_t stop_virtual_ips();
-
+switch_status_t map_vip(switch_status_t (*vip_func)(virtual_ip_t *vip));
+switch_status_t autostart_vip(virtual_ip_t *vip);
 
 switch_status_t cmd_status(switch_stream_handle_t *stream)
 {
@@ -52,12 +49,12 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     void *val;
     const void *vvar;
     virtual_ip_t *vip = NULL;
-    const char *line = "=================================================================================================";
-    const char *line2 = "-------------------------------------------------------------------------------------------------";
+    const char *line1 = "================================================================================\n";
+    const char *line2 = "--------------------------------------------------------------------------------\n";
 
-    stream->write_function(stream, "%25s\t  %20s\t  %10s\t \n",
-                           "Virtual Ip", "Master Ip", "State");
-    stream->write_function(stream, "%s\n", line);
+    stream->write_function(stream, "%25s\t%20s\t%10s\t\n%s",
+                           "Virtual Ip", "Master Ip", "State", line1);
+
     for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
                                                     hi = switch_hash_next(hi)) {
         node_t *list;
@@ -65,76 +62,36 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
         vip = (virtual_ip_t *) val;
         list = vip->node_list;
 
-        stream->write_function(stream, "%25s/%d\t  %20s\t  %10s\t\n", vip->address,
-                               vip->netmask, utils_node_pid_format(vip->master_id),
-                               virtual_ip_get_state(vip));
-printf("%d\n",vip->netmask);
-        stream->write_function(stream, "%s\n", line2);
-
-        if (list == NULL) {
-            stream->write_function(stream, "%s\n", line);
+        stream->write_function(stream, "%25s\t%20s\t%10s\t\n%s",
+                               vip->config.address,
+                               utils_node_pid_format(vip->master_id),
+                               virtual_ip_get_state(vip), line2);
+        if (!list) {
+            stream->write_function(stream, line1);
             continue;
         }
-        while (list != NULL) {
-            stream->write_function(stream,"\t%s priority %d\n",
-                           utils_node_pid_format(list->nodeid), list->priority);
+        while (list) {
+            stream->write_function(stream,"priority%17d\t%20s\n",
+                                   list->priority,
+                                   utils_node_pid_format(list->nodeid));
             list = list->next;
         }
-        stream->write_function(stream, "%s\n", line2);
+        stream->write_function(stream, line2);
 //TODO profili e rollback
 /*        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));*/
-/*        if (vip->rollback_node_id != 0) {*/
-/*            stream->write_function(stream, "%s\n", line2);*/
-/*            stream->write_function(stream,*/
-/*                                  "\tRollback timer started, migration to %s\n",*/
-/*                              utils_node_pid_format(vip->rollback_node_id));*/
-/*        }*/
-        stream->write_function(stream, "%s\n", line);
-
-    }
-    stream->write_function(stream, "%s\n", line);
-
-    return SWITCH_STATUS_SUCCESS;
-}
-
-switch_status_t autostart_virtual_ips()
-{
-    switch_hash_index_t *hi;
-    void *val;
-    const void *vvar;
-    virtual_ip_t *vip = NULL;
-
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
-                                                      hi = switch_hash_next(hi))
-    {
-
-        switch_hash_this(hi, &vvar, NULL, &val);
-        vip = (virtual_ip_t *) val;
-        if (vip->autoload == SWITCH_TRUE) {
-            virtual_ip_start(vip);
+        if (vip->state == ST_RBACK) {
+            stream->write_function(stream, line2);
+            stream->write_function(stream,
+                                  "\tRollback timer started, migration to %s\n",
+                                  utils_node_pid_format(vip->rollback_node_id));
         }
+        stream->write_function(stream, line1);
+
     }
+    stream->write_function(stream, line1);
+
     return SWITCH_STATUS_SUCCESS;
 }
-
-switch_status_t stop_virtual_ips()
-{
-    switch_hash_index_t *hi;
-    void *val;
-    const void *vvar;
-    virtual_ip_t *vip = NULL;
-
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
-         hi; hi = switch_hash_next(hi))
-    {
-        switch_hash_this(hi, &vvar, NULL, &val);
-        vip = (virtual_ip_t *) val;
-
-        virtual_ip_stop(vip);
-    }
-    return SWITCH_STATUS_SUCCESS;
-}
-
 
 switch_status_t cmd_vip(char **argv, int argc,switch_stream_handle_t *stream)
 {
@@ -261,12 +218,12 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 
     globals.running = 1;
 
-    //start_profiles();
+    map_vip(autostart_vip);
 
     SWITCH_ADD_API(api_interface, "cpg", "cpg API", cpg_function, "syntax");
     switch_console_set_complete("add cpg help");
     switch_console_set_complete("add cpg status");
-    switch_console_set_complete("add cpg profile");
+    switch_console_set_complete("add cpg vip");
 
     /* indicate that the module should continue to be loaded */
     return SWITCH_STATUS_SUCCESS;
@@ -277,31 +234,11 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
 
     switch_console_set_complete("del cpg");
 
-    stop_virtual_ips();
+    map_vip(virtual_ip_stop);
     globals.running = 0;
     switch_event_unbind(&globals.node);
     switch_core_hash_destroy(&globals.virtual_ip_hash);
 
-    return SWITCH_STATUS_SUCCESS;
-}
-
-switch_status_t profiles_state_notification()
-{
-    switch_hash_index_t *hi;
-    void *val;
-    const void *vvar;
-    virtual_ip_t *vip = NULL;
-
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
-
-        switch_hash_this(hi, &vvar, NULL, &val);
-        vip = (virtual_ip_t *) val;
-        if (vip_is_running(vip)) {
-
-            virtual_ip_send_state(vip);
-
-        }
-    }
     return SWITCH_STATUS_SUCCESS;
 }
 
@@ -316,7 +253,7 @@ void event_handler(switch_event_t *event)
         virtual_ip_t *vip;
 
         if ((vip = find_virtual_ip(address))) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",vip->address);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",vip->config.address);
             virtual_ip_send_sql(vip,sql);
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
@@ -327,7 +264,30 @@ void event_handler(switch_event_t *event)
     return;
 }
 
+/*functional helper*/
+switch_status_t map_vip(switch_status_t (*vip_func)(virtual_ip_t *vip))
+{
+    switch_hash_index_t *hi;
+    void *val;
+    const void *vvar;
+    virtual_ip_t *vip = NULL;
 
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
+
+        switch_hash_this(hi, &vvar, NULL, &val);
+        vip = (virtual_ip_t *) val;
+        (*vip_func)(vip);
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t autostart_vip(virtual_ip_t *vip)
+{
+    if (vip->config.autoload == SWITCH_TRUE) {
+        virtual_ip_start(vip);
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
 
 /*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)*/
 /*{*/

@@ -70,15 +70,15 @@ switch_status_t do_config(char *cf)
                                       "virtual_ip %s is not valid\n", address);
             continue;
         }
-        switch_snprintf(vip->address,16,"%s",address);
-        vip->netmask = utils_get_netmask(netmask);
+        switch_snprintf(vip->config.address,16,"%s",address);
+        vip->config.netmask = utils_get_netmask(netmask);
 
-        switch_snprintf(vip->group_name.value,255,"%s",address);
-        vip->group_name.length = strlen(address);
+        switch_snprintf(vip->config.group_name.value,255,"%s",address);
+        vip->config.group_name.length = strlen(address);
 
 
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-               "new virtual_ip %s/%d\n", vip->address, vip->netmask);
+           "new virtual_ip %s/%d\n", vip->config.address, vip->config.netmask);
 
 
         for (param = switch_xml_child(xvip, "param"); 
@@ -88,56 +88,56 @@ switch_status_t do_config(char *cf)
 
             if (!strcmp(var, "device")) {
                 char *mac;
-                switch_snprintf(vip->device,6,"%s",val);
+                switch_snprintf(vip->config.device,6,"%s",val);
                 //get local mac virtual_ip
-                mac = utils_get_mac_addr(vip->device);
+                mac = utils_get_mac_addr(vip->config.device);
 
-                if (vip->device == NULL || mac == NULL) {
+                if (vip->config.device == NULL || mac == NULL) {
                     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                                      "virtual_ip %s: Interface is not valid\n",
-                                                          vip->address);
+                                                          vip->config.address);
                     status = SWITCH_STATUS_FALSE;
                     goto out;
                 }
-                switch_snprintf(vip->mac,18,"%s",mac);
+                switch_snprintf(vip->config.mac,18,"%s",mac);
 
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
                                           "device = %s with mac = %s\n",
-                                           vip->device, vip->mac);
+                                           vip->config.device, vip->config.mac);
 
             } else if (!strcmp(var, "autoload")) {
-                vip->autoload = SWITCH_FALSE;
+                vip->config.autoload = SWITCH_FALSE;
                 if (!strcmp(val, "true")) {
-                    vip->autoload = SWITCH_TRUE;
+                    vip->config.autoload = SWITCH_TRUE;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                        "Autoload = %s\n", vip->autoload == SWITCH_TRUE?
+                        "Autoload = %s\n", vip->config.autoload == SWITCH_TRUE?
                                                              "true":"false" );
 
             } else if (!strcmp(var, "autorollback")) {
-                vip->autorollback = SWITCH_FALSE;
+                vip->config.autorollback = SWITCH_FALSE;
                 if (!strcmp(val, "true")) {
-                    vip->autorollback = SWITCH_TRUE;
+                    vip->config.autorollback = SWITCH_TRUE;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                "Autorollback = %s\n", vip->autorollback == SWITCH_TRUE?
+                "Autorollback = %s\n", vip->config.autorollback == SWITCH_TRUE?
                                                              "true":"false" );
             } else if (!strcmp(var, "rollback-delay")) {
-                vip->rollback_delay = atoi(val);
-                if ( vip->rollback_delay == 0) {
-                    vip->rollback_delay = 1;
+                vip->config.rollback_delay = atoi(val);
+                if ( vip->config.rollback_delay == 0) {
+                    vip->config.rollback_delay = 1;
                 }
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
-                          "Rollback delay = %d\n", vip->rollback_delay);
+                          "Rollback delay = %d\n", vip->config.rollback_delay);
             } else if (!strcmp(var, "priority")) {
-                vip->priority = atoi(val);
+                vip->config.priority = atoi(val);
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, 
-                                      "Priority = %d\n", vip->priority);
+                                      "Priority = %d\n", vip->config.priority);
             }
 
         }
 
-        status = switch_core_hash_insert(globals.virtual_ip_hash, vip->address, vip);
+        status = switch_core_hash_insert(globals.virtual_ip_hash, vip->config.address, vip);
         if (status != SWITCH_STATUS_SUCCESS) {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, 
                                       "Cannot insert virtual_ip data in hash");

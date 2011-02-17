@@ -34,8 +34,8 @@ switch_status_t go_down(virtual_ip_t *vip);
 switch_status_t go_up(virtual_ip_t *vip);
 switch_status_t observe(virtual_ip_t *vip);
 switch_status_t rollback(virtual_ip_t * vip);
-switch_status_t rollbackUP(virtual_ip_t * vip);
-switch_status_t rollbackCK(virtual_ip_t * vip);
+switch_status_t rback_stop(virtual_ip_t *vip);
+switch_status_t rback_check(virtual_ip_t *vip);
 
 switch_status_t noop(virtual_ip_t *vip);
 switch_status_t error(virtual_ip_t *vip);
@@ -44,27 +44,25 @@ switch_status_t dup_warn(virtual_ip_t * vip);
 
 /*actions lookup table*/
 action_t table[MAX_EVENTS][MAX_STATES] = {
-/*ST_IDLE    ,ST_START    ,ST_BACKUP   ,ST_MASTER   ,ST_RBACK   */
+/*ST_IDLE    , ST_START   , ST_BACKUP  , ST_MASTER  , ST_RBACK  */
 { go_up      , error      , error      , error      , error      },/*EVT_START*/
 { error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
 { error      , react      , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
-{ error      , noop       , noop       , noop       , noop       },/*EVT_BACKUP_DOWN*/
-{ error      , error      , error      , rollback   , noop       },/*EVT_RBACK_REQ*/
+{ error      , noop       , noop       , noop       , rback_stop },/*EVT_BACKUP_DOWN*/
+{ error      , error      , error      , rollback   , rback_stop },/*EVT_RBACK_REQ*/
 { error      , go_down    , go_down    , go_down    , go_down    } /*EVT_STOP*/
 
 };
-
-//TODO se sono in RBACK e il nodo che deve sostituirmi è andato giù devo più spegnermi
-// solo se ce n'è un altro dietro e cmq devo ricominciare a contare
-// ST_RBACK EVT_BACKUP_DOWN
 
 /*actions chooser*/
 switch_status_t fsm_do_transaction(virtual_ip_t *vip, event_t event) {
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "virtual_ip= %s, state= %s, event= %s\n", vip->address,
-                      state_to_string(vip->state), event_to_string(event));
+                      "virtual_ip= %s, state= %s, event= %s\n",
+                      vip->config.address, state_to_string(vip->state),
+                      event_to_string(event));
+
     if (((event < 0) || (event >= MAX_EVENTS))
      || ((vip->state < 0) || (vip->state >= MAX_STATES))) {
         return SWITCH_STATUS_FALSE;
@@ -82,8 +80,8 @@ state_t fsm_get_state(virtual_ip_t *vip) {
 /*actions implementations*/
 
 switch_status_t noop(virtual_ip_t * vip) {
-    switch_log_printf(SWITCH_CHANNEL_LOG, 
-                      SWITCH_LOG_INFO,"%s: NOOP\n", vip->address);
+    switch_log_printf(SWITCH_CHANNEL_LOG,
+                      SWITCH_LOG_INFO,"%s: NOOP\n", vip->config.address);
     return SWITCH_STATUS_SUCCESS;
 }
 
@@ -93,7 +91,7 @@ switch_status_t error(virtual_ip_t * vip) {
 
 switch_status_t dup_warn(virtual_ip_t * vip){
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
-                      "%s: DUPLICATE NODE\n", vip->address);
+                      "%s: duplicated node\n", vip->config.address);
     return SWITCH_STATUS_SUCCESS;
 }
 
@@ -116,29 +114,6 @@ switch_status_t rollback(virtual_ip_t * vip)
     }
     return status;
 }
-//TODO
-switch_status_t rollbackUP(virtual_ip_t * vip)
-{
-    switch_status_t status = SWITCH_STATUS_FALSE;
-
-    if ((vip->node_list->nodeid != vip->node_id) &&
-       (vip->node_list->nodeid != vip->rollback_node_id)) {
-
-        vip->rollback_node_id = vip->node_list->nodeid;
-        //TODO status = launch_rollback_thread(vip)
-        status = SWITCH_STATUS_SUCCESS;
-    }
-    return status;
-}
-//TODO
-switch_status_t rollbackCK(virtual_ip_t * vip)
-{
-    if (node_search(vip->node_list, vip->rollback_node_id) == NULL) {
-        //stoppa il thread del rollback
-        //join
-    }
-    return SWITCH_STATUS_SUCCESS;
-}
 
 switch_status_t react(virtual_ip_t *vip)
 {
@@ -148,13 +123,13 @@ switch_status_t react(virtual_ip_t *vip)
         vip->state = ST_MASTER;
 
         // set the ip to bind to
-        if (utils_add_vip(vip->address, vip->device) != SWITCH_STATUS_SUCCESS) {
+        if (utils_add_vip(vip->config.address, vip->config.device) != SWITCH_STATUS_SUCCESS) {
             goto error;
         }
 
         // gratuitous arp request
-        if (utils_send_gARP(vip->mac, vip->address, vip->device) != SWITCH_STATUS_SUCCESS) {
-            utils_remove_vip(vip->address, vip->device);
+        if (utils_send_gARP(vip->config.mac, vip->config.address, vip->config.device) != SWITCH_STATUS_SUCCESS) {
+            utils_remove_vip(vip->config.address, vip->config.device);
             goto error;
         }
 
@@ -174,15 +149,15 @@ switch_status_t react(virtual_ip_t *vip)
 /*        //FIXME sistemare la delete con il nome del profilo!*/
 /*        sql = switch_mprintf("delete from sip_recovery where "*/
 /*                     "runtime_uuid='%q' and profile_name='%q'",*/
-/*                          vip->runtime_uuid, vip->address);*/
+/*                          vip->runtime_uuid, vip->config.address);*/
 
-/*        utils_send_track_event(sql, vip->address);*/
+/*        utils_send_track_event(sql, vip->config.address);*/
 /*        switch_safe_free(sql);*/
     }
     return SWITCH_STATUS_SUCCESS;
 
 error:
-    switch_log_printf(SWITCH_CHANNEL_LOG, 
+    switch_log_printf(SWITCH_CHANNEL_LOG,
                       SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
     go_down(vip);
     return SWITCH_STATUS_FALSE;
@@ -212,7 +187,7 @@ switch_status_t go_down(virtual_ip_t *vip)
         switch_thread_join(&status, vip->virtual_ip_thread);
         vip->virtual_ip_thread = NULL;
     }
-    utils_remove_vip(vip->address, vip->device);
+    utils_remove_vip(vip->config.address, vip->config.device);
 
     //TODO stop sofia profile
 
@@ -237,7 +212,15 @@ switch_status_t go_up(virtual_ip_t *vip)
     switch_thread_create(&(vip->virtual_ip_thread),
                          thd_attr, vip_thread, vip, globals.pool);
     //TODO start sofia profile?
+    utils_start_sofia_profile("internal");
+    
     return SWITCH_STATUS_SUCCESS;
 }
 
-
+switch_status_t rback_stop(virtual_ip_t *vip)
+{
+    if ((vip->rollback_node_id == 0) || (vip->rollback_node_id != node_first(vip->node_list))){
+        vip->state = ST_MASTER;
+    }
+    return SWITCH_STATUS_SUCCESS;
+}
