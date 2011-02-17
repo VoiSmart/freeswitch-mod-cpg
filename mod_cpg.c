@@ -56,7 +56,7 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     const char *line2 = "-------------------------------------------------------------------------------------------------";
 
     stream->write_function(stream, "%25s\t  %20s\t  %10s\t \n",
-                                                         "Name", "Ip", "State");
+                           "Virtual Ip", "Master Ip", "State");
     stream->write_function(stream, "%s\n", line);
     for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
                                                     hi = switch_hash_next(hi)) {
@@ -65,29 +65,30 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
         vip = (virtual_ip_t *) val;
         list = vip->node_list;
 
-        stream->write_function(stream, "%25s\t  %20s\t  %10s\t is%s running\n",
-                               vip->address, vip->address,
-                               virtual_ip_get_state(vip),
-                               (vip->state != ST_IDLE)?"":" not");
+        stream->write_function(stream, "%25s/%d\t  %20s\t  %10s\t\n", vip->address,
+                               vip->netmask, utils_node_pid_format(vip->master_id),
+                               virtual_ip_get_state(vip));
+printf("%d\n",vip->netmask);
         stream->write_function(stream, "%s\n", line2);
-        stream->write_function(stream,"\tMy master is %s\n",
-                                     utils_node_pid_format(vip->master_id));
-        stream->write_function(stream, "%s\n", line2);
-        if (list == NULL)
-            stream->write_function(stream,"\tEmpty list\n");
+
+        if (list == NULL) {
+            stream->write_function(stream, "%s\n", line);
+            continue;
+        }
         while (list != NULL) {
             stream->write_function(stream,"\t%s priority %d\n",
                            utils_node_pid_format(list->nodeid), list->priority);
             list = list->next;
         }
         stream->write_function(stream, "%s\n", line2);
-        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));
-        if (vip->rollback_node_id != 0) {
-            stream->write_function(stream, "%s\n", line2);
-            stream->write_function(stream,
-                                  "\tRollback timer started, migration to %s\n",
-                              utils_node_pid_format(vip->rollback_node_id));
-        }
+//TODO profili e rollback
+/*        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));*/
+/*        if (vip->rollback_node_id != 0) {*/
+/*            stream->write_function(stream, "%s\n", line2);*/
+/*            stream->write_function(stream,*/
+/*                                  "\tRollback timer started, migration to %s\n",*/
+/*                              utils_node_pid_format(vip->rollback_node_id));*/
+/*        }*/
         stream->write_function(stream, "%s\n", line);
 
     }
