@@ -48,6 +48,32 @@ static const char *line1 = "========================================"
 static const char *line2 = "----------------------------------------"
                            "----------------------------------------\n";
 
+static switch_status_t list_vips(const char *line, const char *cursor, switch_console_callback_match_t **matches)
+{
+        virtual_ip_t *vip = NULL;
+        switch_hash_index_t *hi;
+        void *val;
+        const void *vvar;
+        switch_console_callback_match_t *my_matches = NULL;
+        switch_status_t status = SWITCH_STATUS_FALSE;
+
+/*TODO    switch_mutex_lock(mod_sofia_globals.hash_mutex);*/
+        for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
+            switch_hash_this(hi, &vvar, NULL, &val);
+            vip = (virtual_ip_t *) val;
+            switch_console_push_match(&my_matches, (const char *) vvar);
+        }
+/*        switch_mutex_unlock(mod_sofia_globals.hash_mutex);*/
+
+        if (my_matches) {
+                *matches = my_matches;
+                status = SWITCH_STATUS_SUCCESS;
+        }
+
+
+        return status;
+}
+
 switch_status_t cmd_status(switch_stream_handle_t *stream)
 {
     switch_hash_index_t *hi;
@@ -228,14 +254,18 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
     switch_console_set_complete("add cpg help");
     switch_console_set_complete("add cpg status");
     switch_console_set_complete("add cpg vip");
-
+    switch_console_set_complete("add cpg vip ::cpg::list_vips start");
+    switch_console_set_complete("add cpg vip ::cpg::list_vips stop");
+    
+    switch_console_add_complete_func("::cpg::list_vips", list_vips);
+    
     /* indicate that the module should continue to be loaded */
     return SWITCH_STATUS_SUCCESS;
 }
 
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
 {
-
+    switch_console_del_complete_func("::cpg::list_vips");
     switch_console_set_complete("del cpg");
 
     map_vip(virtual_ip_stop);
