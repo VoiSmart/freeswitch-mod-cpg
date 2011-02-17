@@ -60,15 +60,16 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 // ST_RBACK EVT_BACKUP_DOWN
 
 /*actions chooser*/
-action_t fsm_do_transaction(event_t event, state_t state) {
+switch_status_t fsm_do_transaction(virtual_ip_t *vip, event_t event) {
+
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "state = %s, event = %s\n",
-                      state_to_string(state), event_to_string(event));
+                      "virtual_ip= %s, state= %s, event= %s\n", vip->address,
+                      state_to_string(vip->state), event_to_string(event));
     if (((event < 0) || (event >= MAX_EVENTS))
-     || ((state < 0) || (state >= MAX_STATES))) {
-        return error;
+     || ((vip->state < 0) || (vip->state >= MAX_STATES))) {
+        return SWITCH_STATUS_FALSE;
     }
-    return table[event][state];
+    return table[event][vip->state] (vip);
 
 }
 

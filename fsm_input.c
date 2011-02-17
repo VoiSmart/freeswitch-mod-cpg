@@ -26,22 +26,6 @@
 
 #include "fsm.h"
 
-switch_status_t
-    fsm_input_node_up(virtual_ip_t *vip, size_t member_list_entries)
-{
-    switch_status_t status = SWITCH_STATUS_FALSE;
-    event_t new_event = MAX_EVENTS;
-
-    if ((member_list_entries == 1)
-    && (fsm_get_state(vip) == ST_START)) {
-        // I'm the master
-        new_event = EVT_MASTER_DOWN;
-    }
-
-    status = fsm_do_transaction(new_event, vip->state) (vip);
-    return (new_event == MAX_EVENTS)? SWITCH_STATUS_SUCCESS:status;
-}
-
 switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
@@ -55,7 +39,7 @@ switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
     switch_log_printf(SWITCH_CHANNEL_LOG,
                       SWITCH_LOG_NOTICE, "nodeid = %u\n",nodeid);
 
-    status = fsm_do_transaction(new_event, vip->state) (vip);
+    status = fsm_do_transaction(vip, new_event);
     return status;
 }
 
@@ -107,7 +91,7 @@ switch_status_t
     }
 
     if (new_event != MAX_EVENTS) {
-        status = fsm_do_transaction(new_event, vip->state) (vip);
+        status = fsm_do_transaction(vip, new_event);
     }
     return status;
 }
@@ -116,13 +100,13 @@ switch_status_t fsm_input_cmd_start(virtual_ip_t *vip)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = EVT_STARTUP;
-    status = fsm_do_transaction(new_event, vip->state) (vip);
+    status = fsm_do_transaction(vip, new_event);
     return status;
 }
 switch_status_t fsm_input_cmd_stop(virtual_ip_t *vip)
 {
     switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = EVT_STOP;
-    status = fsm_do_transaction(new_event, vip->state) (vip);
+    status = fsm_do_transaction(vip, new_event);
     return status;
 }

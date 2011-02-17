@@ -30,7 +30,7 @@
 
 typedef switch_status_t (*action_t) (virtual_ip_t *vip);
 
-action_t fsm_do_transaction(event_t event, state_t state);
+switch_status_t fsm_do_transaction(virtual_ip_t *vip, event_t event);
 
 state_t fsm_get_state(virtual_ip_t *vip);
 
