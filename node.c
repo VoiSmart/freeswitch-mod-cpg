@@ -34,14 +34,16 @@ node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority)
     node_t *new_node, *prev,*curr;
 
     if (node_search(oldlist, nodeid) != NULL) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"Node %s already present\n",
-                                                       utils_node_pid_format(nodeid));
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
+                          "Node %s already present\n",
+                          utils_node_pid_format(nodeid));
         return oldlist;
     }
 
     new_node = malloc(sizeof(node_t));
     if (!new_node) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Cannot allocate node\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                          "Cannot allocate node\n");
         return NULL;
     }
     memset(new_node, 0, sizeof(node_t));
@@ -58,13 +60,15 @@ node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority)
     if (prev != NULL) {
         prev->next = new_node;
         new_node->next = curr;
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,"New node %s/%d\n",
-                                              utils_node_pid_format(nodeid),priority);
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO,
+                          "New node %s/%d\n",
+                          utils_node_pid_format(nodeid),priority);
         return oldlist;
     } else {
         new_node->next = oldlist;
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"New node %s/%d\n",
-                                              utils_node_pid_format(nodeid),priority);
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
+                          "New node %s/%d\n",
+                          utils_node_pid_format(nodeid),priority);
         return new_node;
     }
 }
@@ -72,14 +76,17 @@ node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority)
 node_t *node_remove(node_t *oldlist, uint32_t nodeid)
 {
     node_t *cur, *prev;
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"Remove node %s\n",
-                                                       utils_node_pid_format(nodeid));
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
+                      "Remove node %s\n", utils_node_pid_format(nodeid));
 
-    for (prev = NULL, cur = oldlist; cur != NULL && cur->nodeid != nodeid; prev = cur, cur = cur->next);
+    for (prev = NULL, cur = oldlist;
+         cur != NULL && cur->nodeid != nodeid;
+         prev = cur, cur = cur->next);
 
     if (cur == NULL) {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Node %s not found\n",
-                                                       utils_node_pid_format(nodeid));
+        switch_log_printf(SWITCH_CHANNEL_LOG,
+                          SWITCH_LOG_ERROR,"Node %s not found\n",
+                          utils_node_pid_format(nodeid));
         return oldlist;
     }
     if (prev == NULL) {
@@ -96,10 +103,12 @@ node_t *node_remove(node_t *oldlist, uint32_t nodeid)
 switch_status_t node_remove_all(node_t *list)
 {
     node_t *prev, *current;
-    for (prev = NULL, current = list; current != NULL; prev = current, current = current->next) {
+    for (prev = NULL, current = list;
+         current != NULL; prev = current, current = current->next) {
         if (prev != NULL) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,"Remove node %s\n",
-                                                 utils_node_pid_format(prev->nodeid));
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                              "Remove node %s\n",
+                              utils_node_pid_format(prev->nodeid));
             free(prev);
         }
     }

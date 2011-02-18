@@ -24,7 +24,7 @@
  */
 #ifndef CPG_STRUCT_H
 #define CPG_STRUCT_H
-#define MAX_SOFIA_PROFILE 8
+#define MAX_SOFIA_PROFILES 8
 
 #include <switch.h>
 #include <corosync/cpg.h>
@@ -69,7 +69,7 @@ typedef struct {
         switch_bool_t autoload;
         switch_bool_t autorollback;
         int rollback_delay;
-        sofia_profile_t profiles[MAX_SOFIA_PROFILE];
+        sofia_profile_t profiles[MAX_SOFIA_PROFILES];
     } config;
 /*runtime information*/
     state_t state;

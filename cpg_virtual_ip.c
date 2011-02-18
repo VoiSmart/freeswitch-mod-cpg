@@ -75,7 +75,7 @@ static const char *st_names[MAX_STATES] = {
     "START",
     "BACKUP",
     "MASTER",
-    "RBACK"
+    "ROLLBACK"
 };
 
 static switch_status_t send_message(cpg_handle_t h, void *buf, int len);
@@ -152,7 +152,6 @@ void
     fsm_input_cmd_stop(vip);
     switch_yield(1000000);
     fsm_input_cmd_start(vip);
-    
     return NULL;
 
 stop_rollback:

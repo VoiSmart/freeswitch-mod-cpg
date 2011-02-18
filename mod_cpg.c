@@ -101,19 +101,27 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
             continue;
         }
         while (list) {
-            stream->write_function(stream,"priority%17d\t%20s\n",
+            stream->write_function(stream,"prio/node%16d\t%20s\n",
                                    list->priority,
                                    utils_node_pid_format(list->nodeid));
             list = list->next;
         }
         stream->write_function(stream, line2);
+
+        for (int i = 0; i < MAX_SOFIA_PROFILES; i++) {
+            if (!strcmp(vip->config.profiles[i].name,"")) break;
+            stream->write_function(stream,"profile\t%17s\n",
+                                   vip->config.profiles[i].name);
+        }
+        stream->write_function(stream, line2);
+
 //TODO profili e rollback
 /*        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));*/
         if (vip->state == ST_RBACK) {
             stream->write_function(stream, line2);
             stream->write_function(stream,
-                                  "\tRollback timer started, migration to %s\n",
-                                  utils_node_pid_format(vip->rollback_node_id));
+                                "\tRollback timer started, migration to %s\n",
+                                utils_node_pid_format(vip->rollback_node_id));
         }
         stream->write_function(stream, line1);
 
@@ -175,11 +183,13 @@ SWITCH_STANDARD_API(cpg_function)
     char *mycmd = NULL;
     int lead = 1;
     const char *usage_string = "USAGE:\n"
-        "--------------------------------------------------------------------------------\n"
+        "----------------------------------------"
+        "----------------------------------------\n"
         "cpg help\n"
         "cpg status\n"
         "cpg vip address start/stop\n"
-        "--------------------------------------------------------------------------------\n";
+        "----------------------------------------"
+        "----------------------------------------\n";
     switch_status_t status = SWITCH_STATUS_SUCCESS;
 
     if (zstr(cmd)) {
@@ -226,7 +236,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
 
     /* connect my internal structure to the blank pointer passed to me */
     *module_interface =
-                  switch_loadable_module_create_module_interface(pool, modname);
+              switch_loadable_module_create_module_interface(pool, modname);
 
     globals.pool = pool;
 
@@ -239,7 +249,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
     if (switch_event_bind_removable(modname, SWITCH_EVENT_CUSTOM,
                                     "sofia::recovery_send",
                                     event_handler, NULL,
-                                    &globals.node) != SWITCH_STATUS_SUCCESS) {
+                                    &globals.node) != 
+                                    SWITCH_STATUS_SUCCESS) {
 
         switch_log_printf(SWITCH_CHANNEL_LOG, 
                           SWITCH_LOG_ERROR, "Couldn't bind!\n");

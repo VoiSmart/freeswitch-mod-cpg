@@ -212,7 +212,6 @@ switch_status_t go_up(virtual_ip_t *vip)
     switch_thread_create(&(vip->virtual_ip_thread),
                          thd_attr, vip_thread, vip, globals.pool);
     //TODO start sofia profile?
-    utils_start_sofia_profile("internal");
     
     return SWITCH_STATUS_SUCCESS;
 }
