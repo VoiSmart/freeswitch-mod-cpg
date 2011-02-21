@@ -48,7 +48,9 @@ static const char *line1 = "========================================"
 static const char *line2 = "----------------------------------------"
                            "----------------------------------------\n";
 
-static switch_status_t list_vips(const char *line, const char *cursor, switch_console_callback_match_t **matches)
+static switch_status_t
+    list_vips(const char *line, const char *cursor,
+              switch_console_callback_match_t **matches)
 {
         virtual_ip_t *vip = NULL;
         switch_hash_index_t *hi;
@@ -58,7 +60,9 @@ static switch_status_t list_vips(const char *line, const char *cursor, switch_co
         switch_status_t status = SWITCH_STATUS_FALSE;
 
 /*TODO    switch_mutex_lock(mod_sofia_globals.hash_mutex);*/
-        for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
+        for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
+             hi; hi = switch_hash_next(hi)) {
+
             switch_hash_this(hi, &vvar, NULL, &val);
             vip = (virtual_ip_t *) val;
             switch_console_push_match(&my_matches, (const char *) vvar);
@@ -85,8 +89,9 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
     stream->write_function(stream, "%25s\t%20s\t%10s\t\n%s",
                            "Virtual Ip", "Master Ip", "State", line1);
 
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi;
-                                                    hi = switch_hash_next(hi)) {
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
+         hi; hi = switch_hash_next(hi)) {
+
         node_t *list;
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
@@ -200,7 +205,9 @@ SWITCH_STANDARD_API(cpg_function)
         status = SWITCH_STATUS_MEMERR;
         goto done;
     }
-    if (!(argc = switch_separate_string(mycmd, ' ', argv, (sizeof(argv) / sizeof(argv[0])))) || !argv[0]) {
+    if (!(argc = switch_separate_string(mycmd, ' ', argv,
+       (sizeof(argv) / sizeof(argv[0])))) || !argv[0]) {
+
         stream->write_function(stream, "%s", usage_string);
         goto done;
     }
@@ -249,10 +256,10 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
     if (switch_event_bind_removable(modname, SWITCH_EVENT_CUSTOM,
                                     "sofia::recovery_send",
                                     event_handler, NULL,
-                                    &globals.node) != 
+                                    &globals.node) !=
                                     SWITCH_STATUS_SUCCESS) {
 
-        switch_log_printf(SWITCH_CHANNEL_LOG, 
+        switch_log_printf(SWITCH_CHANNEL_LOG,
                           SWITCH_LOG_ERROR, "Couldn't bind!\n");
         return SWITCH_STATUS_TERM;
     }
@@ -267,9 +274,9 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
     switch_console_set_complete("add cpg vip");
     switch_console_set_complete("add cpg vip ::cpg::list_vips start");
     switch_console_set_complete("add cpg vip ::cpg::list_vips stop");
-    
+
     switch_console_add_complete_func("::cpg::list_vips", list_vips);
-    
+
     /* indicate that the module should continue to be loaded */
     return SWITCH_STATUS_SUCCESS;
 }
@@ -294,14 +301,17 @@ void event_handler(switch_event_t *event)
 
     switch_assert(event);        // Just a sanity check
 
-    if ((sql = switch_event_get_header_nil(event, "sql")) && (address = switch_event_get_header_nil(event, "profile_name"))) {
+    if ((sql = switch_event_get_header_nil(event, "sql"))
+     && (address = switch_event_get_header_nil(event, "profile_name"))) {
         virtual_ip_t *vip;
 
         if ((vip = find_virtual_ip(address))) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s recovery_send event\n",vip->config.address);
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                              "%s recovery_send event\n",vip->config.address);
             virtual_ip_send_sql(vip,sql);
         } else {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Profile not found!\n");
+            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                              "Profile not found!\n");
         }
 
     }
@@ -317,7 +327,8 @@ switch_status_t map_vip(switch_status_t (*vip_func)(virtual_ip_t *vip))
     const void *vvar;
     virtual_ip_t *vip = NULL;
 
-    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash); hi; hi = switch_hash_next(hi)) {
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
+         hi; hi = switch_hash_next(hi)) {
 
         switch_hash_this(hi, &vvar, NULL, &val);
         vip = (virtual_ip_t *) val;
@@ -337,7 +348,7 @@ switch_status_t autostart_vip(virtual_ip_t *vip)
 /*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)*/
 /*{*/
 /*    char cmd[128];*/
-
+/*TODO*/
 /*    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");*/
