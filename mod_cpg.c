@@ -257,7 +257,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load)
         return SWITCH_STATUS_TERM;
     }
 
-    globals.running = 1;
+    globals.running = SWITCH_TRUE;
 
     map_vip(autostart_vip);
 
@@ -280,7 +280,7 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
     switch_console_set_complete("del cpg");
 
     map_vip(virtual_ip_stop);
-    globals.running = 0;
+    globals.running = SWITCH_FALSE;
     switch_event_unbind(&globals.node);
     switch_core_hash_destroy(&globals.virtual_ip_hash);
 

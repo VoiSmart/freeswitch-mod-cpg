@@ -142,7 +142,7 @@ void
         if (vip->state != ST_RBACK)
             goto stop_rollback;
 
-/*        if (utils_count_profile_channels(vip->config.address) == 0) {*/
+/*TODO        if (utils_count_profile_channels(vip->config.address) == 0) {*/
 /*             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,*/
 /*                            "0 calls for %s!Rollback!\n", vip->config.address);*/
 /*             break;*/
@@ -212,7 +212,7 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
         goto finalize;
     }
 
-    while((vip->state != ST_IDLE) && (globals.running)) {
+    while((vip->state != ST_IDLE) && (globals.running == SWITCH_TRUE)) {
         struct timeval timeout = { 1, 0 };
 
         FD_ZERO (&read_fds);

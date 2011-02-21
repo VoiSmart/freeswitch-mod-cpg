@@ -32,7 +32,7 @@
 struct {
     switch_memory_pool_t *pool;
     switch_hash_t *virtual_ip_hash;
-    short int running;
+    switch_bool_t running;
     switch_bool_t is_connected;
     cpg_handle_t handle;
     switch_event_node_t *node;
