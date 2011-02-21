@@ -52,7 +52,6 @@ static switch_status_t
     list_vips(const char *line, const char *cursor,
               switch_console_callback_match_t **matches)
 {
-        virtual_ip_t *vip = NULL;
         switch_hash_index_t *hi;
         void *val;
         const void *vvar;
@@ -64,7 +63,6 @@ static switch_status_t
              hi; hi = switch_hash_next(hi)) {
 
             switch_hash_this(hi, &vvar, NULL, &val);
-            vip = (virtual_ip_t *) val;
             switch_console_push_match(&my_matches, (const char *) vvar);
         }
 /*        switch_mutex_unlock(mod_sofia_globals.hash_mutex);*/
