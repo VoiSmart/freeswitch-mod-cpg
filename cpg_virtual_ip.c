@@ -416,7 +416,7 @@ static switch_status_t send_message(cpg_handle_t h, void *buf, int len)
     error = cpg_mcast_joined(h, CPG_TYPE_AGREED, &iov, 1);
     if (error == CPG_ERR_TRY_AGAIN) {
         retries++;
-        usleep(1000);
+        switch_yield(1000);
         if (!(retries % 100))
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                               "cpg_mcast_joined retry %d\n", retries);
