@@ -34,7 +34,7 @@ switch_status_t virtual_ip_start(virtual_ip_t *vip);
 switch_status_t virtual_ip_stop(virtual_ip_t *vip);
 
 switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
-                                    short int pindex, char *sql);
+                                    char *name, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 
 /*local utils*/

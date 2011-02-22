@@ -307,28 +307,30 @@ static void DeliverCallback (
     switch (hd->type) {
         case SQL:
             if (vip->node_id != nodeid) {
-                char *sql;
-                short int index;
+                char *sql = NULL;
+                char *profile_name = NULL;
 
-                index = *((char *)msg + sizeof(header_t));
-                sql = (char *)msg + sizeof(header_t) + sizeof(short int);
+                profile_name = (char *)msg + sizeof(header_t);
+                sql = (char *)msg + sizeof(header_t) + MAX_SOFIA_NAME;
 
-                if ((index >= 0) &&
-                    (index <= MAX_SOFIA_PROFILES) &&
-                    strcmp(vip->config.profiles[index].name,"")) {
+printf("remote %s\n",profile_name);
+printf("remote\n%s\n",sql);
 
-                    utils_send_track_event(sql,
-                                           vip->config.profiles[index].name);
+                for (int i=0; i<MAX_SOFIA_PROFILES; i++) {
+                    if (!strcmp(vip->config.profiles[i].name, profile_name)) {
 
-                    switch_log_printf(SWITCH_CHANNEL_LOG,
-                                      SWITCH_LOG_DEBUG,
-                                      "received sql from other node\n");
+                        utils_send_track_event(sql,
+                                               vip->config.profiles[i].name);
 
-                } else {
-                    switch_log_printf(SWITCH_CHANNEL_LOG,
-                                      SWITCH_LOG_ERROR,
-                                      "invalid profile index!\n");
+                        switch_log_printf(SWITCH_CHANNEL_LOG,
+                                          SWITCH_LOG_DEBUG,
+                                          "received sql from other node\n");
+                        goto end;
+                    }
                 }
+                switch_log_printf(SWITCH_CHANNEL_LOG,
+                                  SWITCH_LOG_ERROR,
+                                  "invalid profile index!\n");
 
             } else {
                 switch_log_printf(SWITCH_CHANNEL_LOG,
@@ -347,7 +349,7 @@ static void DeliverCallback (
             switch_log_printf(SWITCH_CHANNEL_LOG,
                               SWITCH_LOG_ERROR,"Bad header\n");
     }
-
+end:
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                       "DeliverCallback: message (len=%lu)from %s\n",
                       (unsigned long int) msg_len,
@@ -399,16 +401,18 @@ static void ConfchgCallback (
 
 /* send messages */
 
-switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
-                                    short int pindex, char *sql)
+switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *name, char *sql)
 {
     header_t *hd;
     char *buf;
     int len;
-    short int *index = 0;
     switch_status_t status;
 
-    len = sizeof(header_t) + sizeof(pindex) + strlen(sql) + 1;
+    if (!name) {
+        return SWITCH_STATUS_FALSE;
+    }
+
+    len = sizeof(header_t) + MAX_SOFIA_NAME + strlen(sql) + 1;
     buf = malloc(len);
     if (buf == NULL) {
         return SWITCH_STATUS_FALSE;
@@ -418,9 +422,8 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
     hd = (header_t *) buf;
     hd->type = SQL;
 
-    index = (short int *) ((char *) buf + sizeof(header_t));
-    *index = pindex;
-    memcpy(buf+sizeof(header_t)+sizeof(pindex), sql, strlen(sql) + 1);
+    memcpy(buf+sizeof(header_t), name, MAX_SOFIA_NAME);
+    memcpy(buf+sizeof(header_t) + MAX_SOFIA_NAME, sql, strlen(sql) + 1);
 
     status = send_message(vip->handle,buf,len);
 
