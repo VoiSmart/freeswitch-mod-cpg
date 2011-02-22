@@ -298,7 +298,6 @@ void event_handler(switch_event_t *event)
 {
     char *sql = NULL;
     char *profile_name = NULL;
-    short int pindex = -1;
 
     switch_assert(event);        // Just a sanity check
 
@@ -307,15 +306,15 @@ void event_handler(switch_event_t *event)
         virtual_ip_t *vip;
 
         if ((vip = find_virtual_ip_from_profile(profile_name))) {
-            if ((pindex = virtual_ip_profile_index(vip, profile_name)) >= 0) {
 
                 switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
                                   "%s recovery_send event\n",
                                   profile_name);
-                virtual_ip_send_sql(vip, pindex, sql);
-printf("%s\n",sql);
-printf("%d\n", pindex);
-            }
+
+                virtual_ip_send_sql(vip, profile_name, sql);
+
+printf("local\n%s\n",sql);
+
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                               "Profile not found!\n");
