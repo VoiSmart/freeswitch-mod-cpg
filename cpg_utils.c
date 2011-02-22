@@ -363,7 +363,7 @@ static int show_callback(void *pArg, int argc, char **argv, char **columnNames)
 
 int utils_count_profile_channels(char *profile_name)
 {
-    char sql[1024];
+    char *sql;
     char *errmsg;
     switch_cache_db_handle_t *db;
     int count = 0;
@@ -375,9 +375,14 @@ int utils_count_profile_channels(char *profile_name)
         return -1;
     }
 
-    switch_snprintf(sql,sizeof(sql),"select * from channels where hostname='%s' AND (name LIKE 'sofia/%s/%')", hostname, profile_name);
+    sql = switch_mprintf("select * from channels where hostname='%s' AND (name LIKE 'sofia/%s/%')", hostname, profile_name);
+
+    if (!sql)
+        return -1;
 
     status = switch_cache_db_execute_sql_callback(db, sql, show_callback, &count, &errmsg);
+
+    switch_safe_free(sql);
 
     if (errmsg) {
         free(errmsg);
