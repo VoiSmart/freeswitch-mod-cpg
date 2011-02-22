@@ -25,6 +25,7 @@
 #ifndef CPG_STRUCT_H
 #define CPG_STRUCT_H
 #define MAX_SOFIA_PROFILES 8
+#define MAX_SOFIA_NAME 128
 
 #include <switch.h>
 #include <corosync/cpg.h>
@@ -51,7 +52,7 @@ typedef enum {
 } state_t;
 
 typedef struct {
-    char name[256];
+    char name[MAX_SOFIA_NAME];
     switch_bool_t autorecover;
     switch_bool_t running;
 } sofia_profile_t;
