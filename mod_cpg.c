@@ -34,9 +34,10 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown);
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_cpg_load);
 
-/*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime);*/
-/*Defines a switch_loadable_module_function_table_t and a static const char[] modname*/
-SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load, mod_cpg_shutdown, NULL/*mod_cpg_runtime*/);
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime);
+
+SWITCH_MODULE_DEFINITION(mod_cpg, mod_cpg_load,
+                         mod_cpg_shutdown, mod_cpg_runtime);
 
 
 void event_handler(switch_event_t *event);
@@ -118,10 +119,11 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
         }
         stream->write_function(stream, line2);
 
-//TODO profili e rollback
-/*        stream->write_function(stream, "\t%d active channels on this profile\n", utils_count_profile_channels(vip->address));*/
+//TODO conta canali
+/*        stream->write_function(stream, "\t%d active channels on"
+                                 " this profile\n",
+                                 utils_count_profile_channels(vip->address));*/
         if (vip->state == ST_RBACK) {
-            stream->write_function(stream, line2);
             stream->write_function(stream,
                                 "\tRollback timer started, migration to %s\n",
                                 utils_node_pid_format(vip->rollback_node_id));
@@ -350,30 +352,36 @@ switch_status_t autostart_vip(virtual_ip_t *vip)
     return SWITCH_STATUS_SUCCESS;
 }
 
-/*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)*/
-/*{*/
-/*    char cmd[128];*/
-/*TODO runtime per ping*/
-/*    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);*/
-/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);*/
-/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");*/
-/*    globals.is_connected = SWITCH_TRUE;*/
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)
+{
+    char cmd[128];
 
-/*    while(globals.running) {*/
+    switch_snprintf(cmd,sizeof(cmd),
+                    "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);
 
-/*        if (system(cmd) != 0) {*/
-/*            globals.is_connected = SWITCH_FALSE;*/
-/*            stop_virtual_ips();*/
-/*        } else { //è andato a buon fine*/
-/*            if (globals.is_connected == SWITCH_FALSE) { //se ero standby divento init*/
-/*                globals.is_connected = SWITCH_TRUE;*/
-/*                start_profiles();*/
-/*            }*/
-/*        }*/
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                      "Arbiter path: %s\n", cmd);
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
+                      "Runtime Started\n");
 
-/*        switch_yield(5000000);*/
+    globals.is_connected = SWITCH_TRUE;
 
-/*    }*/
-/*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime terminated\n");*/
-/*    return SWITCH_STATUS_TERM;*/
-/*}*/
+    while(globals.running) {
+
+        if (system(cmd) != 0) {
+            globals.is_connected = SWITCH_FALSE;
+            map_vip(virtual_ip_stop);
+        } else { //è andato a buon fine
+            if (globals.is_connected == SWITCH_FALSE) {
+                globals.is_connected = SWITCH_TRUE;
+                map_vip(autostart_vip);
+            }
+        }
+
+        switch_yield(5000000);
+
+    }
+    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,
+                      "Runtime terminated\n");
+    return SWITCH_STATUS_TERM;
+}
