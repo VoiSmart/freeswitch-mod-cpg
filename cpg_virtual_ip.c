@@ -104,6 +104,44 @@ virtual_ip_t *find_virtual_ip(char *address)
     return vip;
 }
 
+virtual_ip_t *find_virtual_ip_from_profile(char *profile_name)
+{
+    switch_hash_index_t *hi;
+    void *val;
+    const void *vvar;
+    virtual_ip_t *vip = NULL;
+
+    if (!profile_name)
+        return NULL;
+
+    for (hi = switch_hash_first(NULL, globals.virtual_ip_hash);
+         hi; hi = switch_hash_next(hi)) {
+
+        switch_hash_this(hi, &vvar, NULL, &val);
+        vip = (virtual_ip_t *) val;
+
+        for (int i = 0; i < MAX_SOFIA_PROFILES; i++) {
+            if (!strcmp(vip->config.profiles[i].name, "")) break;
+            if (!strcmp(vip->config.profiles[i].name, profile_name)) {
+                return vip;
+            }
+        }
+
+    }
+    return NULL;
+}
+
+short int virtual_ip_profile_index(virtual_ip_t *vip, char *profile_name)
+{
+    for (int i = 0; i < MAX_SOFIA_PROFILES; i++) {
+        if (!strcmp(vip->config.profiles[i].name, "")) return -1;
+        if (!strcmp(vip->config.profiles[i].name, profile_name)) {
+            return i;
+        }
+    }
+    return -2;
+}
+
 const char *virtual_ip_get_state(virtual_ip_t *vip)
 {
     return state_to_string(vip->state);
@@ -270,12 +308,32 @@ static void DeliverCallback (
         case SQL:
             if (vip->node_id != nodeid) {
                 char *sql;
-                sql = (char *)msg + sizeof(header_t);
-                utils_send_track_event(sql, vip->config.address);
+                short int index;
 
-                switch_log_printf(SWITCH_CHANNEL_LOG,
-                                  SWITCH_LOG_DEBUG,
-                                  "received sql from other node\n");
+                index = *((char *)msg + sizeof(header_t));
+                sql = (char *)msg + sizeof(header_t) + sizeof(short int);
+                printf("%s\n", sql);
+                if ((index >= 0) && (index <= MAX_SOFIA_PROFILES)) {
+                    printf("%d\n", index);
+
+                    if (strcmp(vip->config.profiles[index].name,"")) {
+                        utils_send_track_event(sql, vip->config.profiles[index].name);
+
+                        switch_log_printf(SWITCH_CHANNEL_LOG,
+                                          SWITCH_LOG_DEBUG,
+                                          "received sql from other node\n");
+                    } else {
+                        switch_log_printf(SWITCH_CHANNEL_LOG,
+                                          SWITCH_LOG_ERROR,
+                                          "index points to invelid profile!\n");
+                    }
+
+                } else {
+                    switch_log_printf(SWITCH_CHANNEL_LOG,
+                                      SWITCH_LOG_ERROR,
+                                      "invalid profile index!\n");
+                }
+
             } else {
                 switch_log_printf(SWITCH_CHANNEL_LOG,
                                   SWITCH_LOG_DEBUG,"discarded my sql\n");
@@ -345,14 +403,16 @@ static void ConfchgCallback (
 
 /* send messages */
 
-switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql)
+switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
+                                    short int pindex, char *sql)
 {
     header_t *hd;
     char *buf;
     int len;
+    short int *index = 0;
     switch_status_t status;
 
-    len = sizeof(header_t) + strlen(sql) + 1;
+    len = sizeof(header_t) + sizeof(pindex) + strlen(sql) + 1;
     buf = malloc(len);
     if (buf == NULL) {
         return SWITCH_STATUS_FALSE;
@@ -362,7 +422,9 @@ switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql)
     hd = (header_t *) buf;
     hd->type = SQL;
 
-    memcpy(buf+sizeof(header_t), sql, strlen(sql) + 1);
+    index = (short int *) ((char *) buf + sizeof(header_t));
+    *index = pindex;
+    memcpy(buf+sizeof(header_t)+sizeof(pindex), sql, strlen(sql) + 1);
 
     status = send_message(vip->handle,buf,len);
 

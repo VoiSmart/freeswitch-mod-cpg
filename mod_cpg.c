@@ -295,18 +295,25 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_cpg_shutdown)
 void event_handler(switch_event_t *event)
 {
     char *sql = NULL;
-    char *address = NULL;
+    char *profile_name = NULL;
+    short int pindex = -1;
 
     switch_assert(event);        // Just a sanity check
 
     if ((sql = switch_event_get_header_nil(event, "sql"))
-     && (address = switch_event_get_header_nil(event, "profile_name"))) {
+     && (profile_name = switch_event_get_header_nil(event, "profile_name"))) {
         virtual_ip_t *vip;
 
-        if ((vip = find_virtual_ip(address))) {
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                              "%s recovery_send event\n",vip->config.address);
-            virtual_ip_send_sql(vip,sql);
+        if ((vip = find_virtual_ip_from_profile(profile_name))) {
+            if ((pindex = virtual_ip_profile_index(vip, profile_name)) >= 0) {
+
+                switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+                                  "%s recovery_send event\n",
+                                  profile_name);
+                virtual_ip_send_sql(vip, pindex, sql);
+printf("%s\n",sql);
+printf("%d\n", pindex);
+            }
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                               "Profile not found!\n");
@@ -346,7 +353,7 @@ switch_status_t autostart_vip(virtual_ip_t *vip)
 /*SWITCH_MODULE_RUNTIME_FUNCTION(mod_cpg_runtime)*/
 /*{*/
 /*    char cmd[128];*/
-/*TODO*/
+/*TODO runtime per ping*/
 /*    switch_snprintf(cmd,sizeof(cmd), "%s/bin/arbiter.sh", SWITCH_GLOBAL_dirs.base_dir);*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Arbiter path: %s\n", cmd);*/
 /*    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Runtime Started\n");*/

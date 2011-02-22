@@ -29,6 +29,7 @@
 #include "mod_cpg.h"
 
 /*actions definitions*/
+switch_status_t act(virtual_ip_t *vip);
 switch_status_t react(virtual_ip_t *vip);
 switch_status_t go_down(virtual_ip_t *vip);
 switch_status_t go_up(virtual_ip_t *vip);
@@ -47,7 +48,7 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 /*ST_IDLE    , ST_START   , ST_BACKUP  , ST_MASTER  , ST_RBACK  */
 { go_up      , error      , error      , error      , error      },/*EVT_START*/
 { error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
-{ error      , react      , react      , error      , error      },/*EVT_MASTER_DOWN*/
+{ error      , act        , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
 { error      , noop       , noop       , noop       , rback_stop },/*EVT_BACKUP_DOWN*/
 { error      , error      , error      , rollback   , rback_stop },/*EVT_RBACK_REQ*/
@@ -115,6 +116,41 @@ switch_status_t rollback(virtual_ip_t * vip)
     return status;
 }
 
+switch_status_t act(virtual_ip_t *vip)
+{
+    // if I'm the first in priority list
+    if ( vip->node_id == node_first(vip->node_list)) {
+        // become master
+        vip->state = ST_MASTER;
+
+        // set the ip to bind to
+        if (utils_add_vip(vip->config.address,
+                          vip->config.device) != SWITCH_STATUS_SUCCESS) {
+            goto error;
+        }
+
+        // gratuitous arp request
+        if (utils_send_gARP(vip->config.mac,
+                            vip->config.address,
+                            vip->config.device) != SWITCH_STATUS_SUCCESS) {
+
+            utils_remove_vip(vip->config.address, vip->config.device);
+            goto error;
+        }
+
+        // and I say it to all other nodes
+        virtual_ip_send_state(vip);
+        return SWITCH_STATUS_SUCCESS;
+    }
+
+error:
+    switch_log_printf(SWITCH_CHANNEL_LOG,
+                      SWITCH_LOG_ERROR,"Failed transition to MASTER!\n");
+    go_down(vip);
+    return SWITCH_STATUS_FALSE;
+
+}
+
 switch_status_t react(virtual_ip_t *vip)
 {
     // if I'm the first in priority list
@@ -123,36 +159,38 @@ switch_status_t react(virtual_ip_t *vip)
         vip->state = ST_MASTER;
 
         // set the ip to bind to
-        if (utils_add_vip(vip->config.address, vip->config.device) != SWITCH_STATUS_SUCCESS) {
+        if (utils_add_vip(vip->config.address,
+                          vip->config.device) != SWITCH_STATUS_SUCCESS) {
             goto error;
         }
 
         // gratuitous arp request
-        if (utils_send_gARP(vip->config.mac, vip->config.address, vip->config.device) != SWITCH_STATUS_SUCCESS) {
+        if (utils_send_gARP(vip->config.mac,
+                            vip->config.address,
+                            vip->config.device) != SWITCH_STATUS_SUCCESS) {
             utils_remove_vip(vip->config.address, vip->config.device);
             goto error;
+        }
+
+        // sofia recover!!!
+        for (int i=0; i< MAX_SOFIA_PROFILES; i++) {
+            if (!strcmp(vip->config.profiles[i].name, "")) break;
+            if (vip->config.profiles[i].autorecover == SWITCH_TRUE) {
+                utils_recover(vip->config.profiles[i].name);
+            }
         }
 
         // and I say it to all other nodes
         virtual_ip_send_state(vip);
 
-//TODO sofia recover
-/*        // sofia recover!!!*/
-/*        if (vip->autorecover == SWITCH_TRUE) {*/
-/*            utils_recover(vip->name);*/
-/*        }*/
 
-//TODO se è cascato il master e non devo reagire mi ripulisco la tabella
-/*    } else {*/
-/*        // clean up the table*/
-/*        char *sql;*/
-/*        //FIXME sistemare la delete con il nome del profilo!*/
-/*        sql = switch_mprintf("delete from sip_recovery where "*/
-/*                     "runtime_uuid='%q' and profile_name='%q'",*/
-/*                          vip->runtime_uuid, vip->config.address);*/
-
-/*        utils_send_track_event(sql, vip->config.address);*/
-/*        switch_safe_free(sql);*/
+    } else {
+        // se è cascato il master e non devo reagire mi ripulisco la tabella
+        for (int i=0; i< MAX_SOFIA_PROFILES; i++) {
+            if (!strcmp(vip->config.profiles[i].name, "")) break;
+            utils_clean_up_table(vip->runtime_uuid,
+                                 vip->config.profiles[i].name);
+        }
     }
     return SWITCH_STATUS_SUCCESS;
 
@@ -212,13 +250,13 @@ switch_status_t go_up(virtual_ip_t *vip)
     switch_thread_create(&(vip->virtual_ip_thread),
                          thd_attr, vip_thread, vip, globals.pool);
     //TODO start sofia profile?
-    
     return SWITCH_STATUS_SUCCESS;
 }
 
 switch_status_t rback_stop(virtual_ip_t *vip)
 {
-    if ((vip->rollback_node_id == 0) || (vip->rollback_node_id != node_first(vip->node_list))){
+    if ((vip->rollback_node_id == 0) ||
+        (vip->rollback_node_id != node_first(vip->node_list))){
         vip->state = ST_MASTER;
     }
     return SWITCH_STATUS_SUCCESS;

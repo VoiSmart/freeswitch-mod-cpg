@@ -393,6 +393,22 @@ int utils_count_profile_channels(char *profile_name)
     return count;
 }
 
+
+switch_status_t
+    utils_clean_up_table(char *runtime_uuid, char *sofia_profile_name)
+{
+    // clean up the table
+    char *sql;
+
+    sql = switch_mprintf("delete from sip_recovery where "
+                         "runtime_uuid='%q' and profile_name='%q'",
+                         runtime_uuid, sofia_profile_name);
+
+    utils_send_track_event(sql, sofia_profile_name);
+    switch_safe_free(sql);
+    return SWITCH_STATUS_SUCCESS;
+}
+
 char * utils_node_pid_format(unsigned int nodeid) {
     static char buffer[100];
     struct in_addr saddr;

@@ -32,12 +32,16 @@
 
 switch_status_t virtual_ip_start(virtual_ip_t *vip);
 switch_status_t virtual_ip_stop(virtual_ip_t *vip);
-switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *sql);
+
+switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
+                                    short int pindex, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
 
 /*local utils*/
 const char *virtual_ip_get_state(virtual_ip_t *vip);
 virtual_ip_t *find_virtual_ip(char *address);
+virtual_ip_t *find_virtual_ip_from_profile(char *profile_name);
+short int virtual_ip_profile_index(virtual_ip_t *vip, char *profile_name);
 switch_bool_t vip_is_running(virtual_ip_t *vip);
 
 const char *state_to_string(state_t state);
