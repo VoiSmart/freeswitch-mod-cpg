@@ -312,21 +312,17 @@ static void DeliverCallback (
 
                 index = *((char *)msg + sizeof(header_t));
                 sql = (char *)msg + sizeof(header_t) + sizeof(short int);
-                printf("%s\n", sql);
-                if ((index >= 0) && (index <= MAX_SOFIA_PROFILES)) {
-                    printf("%d\n", index);
 
-                    if (strcmp(vip->config.profiles[index].name,"")) {
-                        utils_send_track_event(sql, vip->config.profiles[index].name);
+                if ((index >= 0) &&
+                    (index <= MAX_SOFIA_PROFILES) &&
+                    strcmp(vip->config.profiles[index].name,"")) {
 
-                        switch_log_printf(SWITCH_CHANNEL_LOG,
-                                          SWITCH_LOG_DEBUG,
-                                          "received sql from other node\n");
-                    } else {
-                        switch_log_printf(SWITCH_CHANNEL_LOG,
-                                          SWITCH_LOG_ERROR,
-                                          "index points to invelid profile!\n");
-                    }
+                    utils_send_track_event(sql,
+                                           vip->config.profiles[index].name);
+
+                    switch_log_printf(SWITCH_CHANNEL_LOG,
+                                      SWITCH_LOG_DEBUG,
+                                      "received sql from other node\n");
 
                 } else {
                     switch_log_printf(SWITCH_CHANNEL_LOG,
