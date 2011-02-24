@@ -22,21 +22,23 @@
  * Phone : +39.02.70633354
  *
  */
-#ifndef MOD_CPG_H
-#define MOD_CPG_H
+#ifndef FSM_INPUT_H
+#define FSM_INPUT_H
 
 #include <switch.h>
-#include <corosync/cpg.h>
-#include <string.h>
-
-struct {
-    switch_memory_pool_t *pool;
-    switch_hash_t *virtual_ip_hash;
-    switch_bool_t running;
-    switch_bool_t is_connected;
-    cpg_handle_t handle;
-    switch_event_node_t *node;
-} globals;
+#include "virtual_ip_types.h"
 
 
+switch_status_t
+    fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid);
+switch_status_t fsm_input_node_up(virtual_ip_t *vip);
+
+switch_status_t
+    fsm_input_new_state_message(virtual_ip_t *vip,
+                                node_msg_t *nm, uint32_t nodeid);
+
+switch_status_t
+    fsm_input_cmd_start(virtual_ip_t *vip);
+switch_status_t
+    fsm_input_cmd_stop(virtual_ip_t *vip);
 #endif

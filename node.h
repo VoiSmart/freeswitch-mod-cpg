@@ -22,21 +22,25 @@
  * Phone : +39.02.70633354
  *
  */
-#ifndef MOD_CPG_H
-#define MOD_CPG_H
+#ifndef CPG_NODE_H
+#define CPG_NODE_H
 
 #include <switch.h>
-#include <corosync/cpg.h>
-#include <string.h>
 
-struct {
-    switch_memory_pool_t *pool;
-    switch_hash_t *virtual_ip_hash;
-    switch_bool_t running;
-    switch_bool_t is_connected;
-    cpg_handle_t handle;
-    switch_event_node_t *node;
-} globals;
+struct node {
+    uint32_t nodeid;
+    int priority;
+    struct node *next;
+};
 
+typedef struct node node_t;
+
+
+node_t *node_add(node_t *oldlist, uint32_t nodeid, int priority);
+node_t *node_remove(node_t *oldlist, uint32_t nodeid);
+switch_status_t node_remove_all(node_t *list);
+node_t *node_search(node_t *list, uint32_t nodeid);
+size_t list_entries(node_t *list);
+uint32_t node_first(node_t *list);
 
 #endif

@@ -24,13 +24,13 @@
  */
 
 #include "cpg_utils.h"
+
 #include <net/if.h>
 #include <arpa/inet.h>
-
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
-
-#include "profile.h"
+#include "arpator.h"
+#include "mod_cpg.h"
 
 typedef enum {
     ADD_IP,
@@ -176,41 +176,6 @@ switch_status_t utils_remove_vip(char *ip,char *dev)
     }
 }
 
-switch_status_t utils_add_arp_rule(char *ip,char *mac)
-{
-
-    if ((!zstr(ip)) && (!zstr(mac))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"arptables -A OUT -s %s --source-mac %s -j DROP", ip, mac);
-        if (system(cmd)){
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot add arptables rule\n");
-            return SWITCH_STATUS_FALSE;
-        }
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"added arptables rule\n");
-        return SWITCH_STATUS_SUCCESS;
-    } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid ip or mac\n");
-        return SWITCH_STATUS_FALSE;
-    }
-}
-
-switch_status_t utils_remove_arp_rule(char *ip,char *mac)
-{
-
-    if ((!zstr(ip)) && (!zstr(mac))) {
-        char cmd[128];
-        switch_snprintf(cmd, sizeof(cmd),"arptables -F OUT");
-        if (system(cmd)){
-            switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot remove arptables rule\n");
-            return SWITCH_STATUS_FALSE;
-        }
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"removed arptables rule\n");
-        return SWITCH_STATUS_SUCCESS;
-    } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid ip or mac\n");
-        return SWITCH_STATUS_FALSE;
-    }
-}
 char *utils_get_mac_addr(char *interface)
 {
     int buflen = 20;
@@ -270,7 +235,6 @@ void utils_reloadxml()
     return;
 }
 
-
 switch_status_t utils_start_sofia_profile(char *profile_name)
 {
     char cmd[128];
@@ -290,6 +254,7 @@ switch_status_t utils_start_sofia_profile(char *profile_name)
             return SWITCH_STATUS_FALSE;
         }
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s started\n", profile_name);
+        switch_safe_free(mystream.data);
         return SWITCH_STATUS_SUCCESS;
     } else {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid profile name\n");
@@ -314,46 +279,13 @@ switch_status_t utils_stop_sofia_profile(char *profile_name)
         }
 
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s stopped\n", profile_name);
+        switch_safe_free(mystream.data);
         return SWITCH_STATUS_SUCCESS;
     } else {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"Invalid profile name\n");
         return SWITCH_STATUS_FALSE;
     }
     return SWITCH_STATUS_FALSE;
-}
-
-char *utils_state_to_string(profile_state_t pstate)
-{
-    char state[12];
-    switch (pstate) {
-            case MASTER:
-                switch_snprintf(state,sizeof(state),"MASTER");
-                break;
-            case BACKUP:
-                switch_snprintf(state,sizeof(state),"BACKUP");
-                break;
-            case INIT:
-                switch_snprintf(state,sizeof(state),"INIT");
-                break;
-            case STANDBY:
-                switch_snprintf(state,sizeof(state),"STANDBY");
-                break;
-            default:
-                switch_snprintf(state,sizeof(state),"Missing");
-                break;
-    }
-    return strdup(state);
-}
-
-profile_state_t utils_string_to_state(char *state)
-{
-    profile_state_t pstate = STANDBY;
-    if (!strcasecmp(state,"MASTER")) pstate = MASTER;
-    else if (!strcasecmp(state,"BACKUP")) pstate = BACKUP;
-    else if (!strcasecmp(state,"INIT")) pstate = INIT;
-    else if (!strcasecmp(state,"STANDBY")) pstate = STANDBY;
-
-    return pstate;
 }
 
 void utils_hupall(char *profile_name)
@@ -369,6 +301,7 @@ void utils_hupall(char *profile_name)
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot hupall for %s\n",profile_name);
         return;
     }
+    switch_safe_free(mystream.data);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"hupall for %s done\n",profile_name);
     return;
 }
@@ -386,7 +319,7 @@ switch_status_t utils_recover(char *profile_name)
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot recover profile %s\n", profile_name);
             return SWITCH_STATUS_FALSE;
         }
-
+        switch_safe_free(mystream.data);
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s recovered\n", profile_name);
         return SWITCH_STATUS_SUCCESS;
     } else {
@@ -418,6 +351,21 @@ void utils_send_track_event(char *sql, char *profile_name)
 
 }
 
+void utils_send_request_all(char *profile_name)
+{
+    switch_event_t *event = NULL;
+
+    if (switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, "sofia::recovery_recv") == SWITCH_STATUS_SUCCESS) {
+        switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "profile_name", profile_name);
+        switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "request_all","true");
+        switch_event_fire(&event);
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "request_all sent\n");
+    } else {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "request_all not sent\n");
+    }
+
+}
+
 static int show_callback(void *pArg, int argc, char **argv, char **columnNames)
 {
     int *count;
@@ -429,7 +377,7 @@ static int show_callback(void *pArg, int argc, char **argv, char **columnNames)
 
 int utils_count_profile_channels(char *profile_name)
 {
-    char sql[1024];
+    char *sql;
     char *errmsg;
     switch_cache_db_handle_t *db;
     int count = 0;
@@ -441,9 +389,14 @@ int utils_count_profile_channels(char *profile_name)
         return -1;
     }
 
-    switch_snprintf(sql,sizeof(sql),"select * from channels where hostname='%s' AND (name LIKE 'sofia/%s/%')", hostname, profile_name);
+    sql = switch_mprintf("select * from channels where hostname='%s' AND (name LIKE 'sofia/%s/%')", hostname, profile_name);
+
+    if (!sql)
+        return -1;
 
     status = switch_cache_db_execute_sql_callback(db, sql, show_callback, &count, &errmsg);
+
+    switch_safe_free(sql);
 
     if (errmsg) {
         free(errmsg);
@@ -459,6 +412,22 @@ int utils_count_profile_channels(char *profile_name)
     return count;
 }
 
+
+switch_status_t
+    utils_clean_up_table(char *runtime_uuid, char *sofia_profile_name)
+{
+    // clean up the table
+    char *sql = NULL;
+
+    sql = switch_mprintf("delete from sip_recovery where "
+                         "runtime_uuid='%q' and profile_name='%q'",
+                         runtime_uuid, sofia_profile_name);
+
+    utils_send_track_event(sql, sofia_profile_name);
+    switch_safe_free(sql);
+    return SWITCH_STATUS_SUCCESS;
+}
+
 char * utils_node_pid_format(unsigned int nodeid) {
     static char buffer[100];
     struct in_addr saddr;
@@ -467,7 +436,40 @@ char * utils_node_pid_format(unsigned int nodeid) {
 #else
     saddr.s_addr = nodeid;
 #endif
-    sprintf(buffer, "node %s", inet_ntoa(saddr));
+    sprintf(buffer, "%s", inet_ntoa(saddr));
 
     return buffer;
+}
+
+switch_bool_t utils_ip_is_valid(char *address) {
+
+    unsigned char buf[sizeof(struct in6_addr)];
+    int s;
+
+    if (!address)
+        return SWITCH_FALSE;
+//TODO controlla anche ipv6
+    s = inet_pton(AF_INET, address, buf);
+
+    if (s != 1)
+        return SWITCH_FALSE;
+
+    return SWITCH_TRUE;
+
+}
+int utils_get_netmask(char *netmask) {
+
+    int nm = atoi(netmask);
+    return (nm <= 0 || nm > 32)? 32: nm;
+
+}
+
+switch_status_t utils_send_gARP(char *mac, char *address, char *device) {
+    int ret = net_send_arp_string(mac, "ff:ff:ff:ff:ff:ff", 1,
+                                  mac,address,mac, address, device);
+    if (ret == 0)
+        return SWITCH_STATUS_SUCCESS;
+
+    return SWITCH_STATUS_FALSE;
+
 }
