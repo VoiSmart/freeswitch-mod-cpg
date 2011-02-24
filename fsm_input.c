@@ -47,6 +47,16 @@ switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
     return status;
 }
 
+switch_status_t fsm_input_node_up(virtual_ip_t *vip)
+{
+    switch_status_t status = SWITCH_STATUS_FALSE;
+    event_t new_event = EVT_BACKUP_UP;
+
+    status = fsm_do_transaction(vip, new_event);
+    return status;
+}
+
+
 
 switch_status_t
     fsm_input_new_state_message(virtual_ip_t *vip,

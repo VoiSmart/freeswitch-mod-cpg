@@ -253,7 +253,6 @@ switch_status_t utils_start_sofia_profile(char *profile_name)
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,"cannot execute sofia api %s\n", profile_name);
             return SWITCH_STATUS_FALSE;
         }
-        printf("%s", (char *)mystream.data);
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE,"profile %s started\n", profile_name);
         switch_safe_free(mystream.data);
         return SWITCH_STATUS_SUCCESS;
@@ -352,6 +351,21 @@ void utils_send_track_event(char *sql, char *profile_name)
 
 }
 
+void utils_send_request_all(char *profile_name)
+{
+    switch_event_t *event = NULL;
+
+    if (switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, "sofia::recovery_recv") == SWITCH_STATUS_SUCCESS) {
+        switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "profile_name", profile_name);
+        switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "request_all","true");
+        switch_event_fire(&event);
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "request_all sent\n");
+    } else {
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "request_all not sent\n");
+    }
+
+}
+
 static int show_callback(void *pArg, int argc, char **argv, char **columnNames)
 {
     int *count;
@@ -403,7 +417,7 @@ switch_status_t
     utils_clean_up_table(char *runtime_uuid, char *sofia_profile_name)
 {
     // clean up the table
-    char *sql;
+    char *sql = NULL;
 
     sql = switch_mprintf("delete from sip_recovery where "
                          "runtime_uuid='%q' and profile_name='%q'",

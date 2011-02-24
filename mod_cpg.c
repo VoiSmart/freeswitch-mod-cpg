@@ -105,8 +105,9 @@ switch_status_t cmd_status(switch_stream_handle_t *stream)
             continue;
         }
         while (list) {
-            stream->write_function(stream,"prio/node%16d\t%20s\n",
+            stream->write_function(stream,"prio/node%16d\t%8s%s\n",
                                    list->priority,
+                                   (list->nodeid==vip->node_id)?"*":"",
                                    utils_node_pid_format(list->nodeid));
             list = list->next;
         }
@@ -312,8 +313,6 @@ void event_handler(switch_event_t *event)
                                   profile_name);
 
                 virtual_ip_send_sql(vip, profile_name, sql);
-
-printf("local\n%s\n",sql);
 
         } else {
             switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,

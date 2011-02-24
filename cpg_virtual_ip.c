@@ -66,6 +66,7 @@ static const char *evt_names[MAX_EVENTS] = {
     "MASTER_DOWN",
     "MASTER_UP",
     "BACKUP_DOWN",
+    "BACKUP_UP",
     "RBACK_REQ",
     "STOP"
 };
@@ -313,9 +314,6 @@ static void DeliverCallback (
                 profile_name = (char *)msg + sizeof(header_t);
                 sql = (char *)msg + sizeof(header_t) + MAX_SOFIA_NAME;
 
-printf("remote %s\n",profile_name);
-printf("remote\n%s\n",sql);
-
                 for (int i=0; i<MAX_SOFIA_PROFILES; i++) {
                     if (!strcmp(vip->config.profiles[i].name, profile_name)) {
 
@@ -394,12 +392,28 @@ static void ConfchgCallback (
         switch_log_printf(SWITCH_CHANNEL_LOG,
                           SWITCH_LOG_INFO, "Someone join!\n");
 
-        virtual_ip_send_state(vip);
+        fsm_input_node_up(vip);
+
     }
 
 }
 
 /* send messages */
+switch_status_t virtual_ip_send_all_sql(virtual_ip_t *vip)
+{
+
+    char *sql = NULL;
+
+    sql = switch_mprintf("");
+
+    for (int i=0;i<MAX_SOFIA_PROFILES; i++) {
+        if (!strcmp(vip->config.profiles[i].name,"")) break;
+        utils_send_request_all(vip->config.profiles[i].name);
+    }
+    switch_safe_free(sql);
+    return SWITCH_STATUS_SUCCESS;
+}
+
 
 switch_status_t virtual_ip_send_sql(virtual_ip_t *vip, char *name, char *sql)
 {

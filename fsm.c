@@ -37,6 +37,8 @@ switch_status_t observe(virtual_ip_t *vip);
 switch_status_t rollback(virtual_ip_t * vip);
 switch_status_t rback_stop(virtual_ip_t *vip);
 switch_status_t rback_check(virtual_ip_t *vip);
+switch_status_t backupup(virtual_ip_t * vip);
+switch_status_t nodeup(virtual_ip_t * vip);
 
 switch_status_t noop(virtual_ip_t *vip);
 switch_status_t error(virtual_ip_t *vip);
@@ -51,6 +53,7 @@ action_t table[MAX_EVENTS][MAX_STATES] = {
 { error      , act        , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
 { error      , noop       , noop       , noop       , rback_stop },/*EVT_BACKUP_DOWN*/
+{ error      , nodeup     , nodeup     , backupup   , backupup   },/*EVT_BACKUP_UP*/
 { error      , error      , error      , rollback   , rback_stop },/*EVT_RBACK_REQ*/
 { error      , go_down    , go_down    , go_down    , go_down    } /*EVT_STOP*/
 
@@ -94,6 +97,20 @@ switch_status_t dup_warn(virtual_ip_t * vip){
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                       "%s: duplicated node\n", vip->config.address);
     return SWITCH_STATUS_SUCCESS;
+}
+
+switch_status_t nodeup(virtual_ip_t * vip)
+{
+    return virtual_ip_send_state(vip);
+}
+
+switch_status_t backupup(virtual_ip_t * vip)
+{
+    switch_status_t status = SWITCH_STATUS_SUCCESS;
+
+    status = virtual_ip_send_state(vip);
+
+    return virtual_ip_send_all_sql(vip) && status;
 }
 
 switch_status_t rollback(virtual_ip_t * vip)

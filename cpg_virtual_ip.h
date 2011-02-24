@@ -36,7 +36,7 @@ switch_status_t virtual_ip_stop(virtual_ip_t *vip);
 switch_status_t virtual_ip_send_sql(virtual_ip_t *vip,
                                     char *name, char *sql);
 switch_status_t virtual_ip_send_state(virtual_ip_t *vip);
-
+switch_status_t virtual_ip_send_all_sql(virtual_ip_t *vip);
 /*local utils*/
 const char *virtual_ip_get_state(virtual_ip_t *vip);
 virtual_ip_t *find_virtual_ip(char *address);

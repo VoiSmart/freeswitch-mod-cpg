@@ -42,6 +42,7 @@ switch_status_t utils_stop_sofia_profile(char *sofia_profile_name);
 void utils_hupall(char *sofia_profile_name);
 void utils_reloadxml();
 void utils_send_track_event(char *sql, char *profile_name);
+void utils_send_request_all(char *profile_name);
 switch_status_t utils_recover(char *sofia_profile_name);
 int utils_count_profile_channels(char *sofia_profile_name);
 switch_status_t
