@@ -229,8 +229,6 @@ switch_status_t go_down(virtual_ip_t *vip)
     vip->master_id = 0;
     vip->rollback_node_id = 0;
 
-    utils_remove_vip(vip->config.address, vip->config.device);
-
     node_remove_all(vip->node_list);
     if (vip->node_list) {
         vip->node_list = NULL;
@@ -244,6 +242,8 @@ switch_status_t go_down(virtual_ip_t *vip)
         switch_thread_join(&status, vip->virtual_ip_thread);
         vip->virtual_ip_thread = NULL;
     }
+
+    utils_remove_vip(vip->config.address, vip->config.device);
 
     // chiudo le chiamate rimaste su
     for (int i=0; i< MAX_SOFIA_PROFILES; i++) {
