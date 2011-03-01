@@ -29,6 +29,8 @@
 #include "fsm_input.h"
 #include "mod_cpg.h"
 
+#define CS_MAX_RETRIES 10
+
 typedef enum {
     SQL,
     NODE_STATE
@@ -217,7 +219,11 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
     switch_log_printf(SWITCH_CHANNEL_LOG,
                       SWITCH_LOG_DEBUG,"%s launch\n", vip->config.address);
 
-    result = cpg_initialize (&vip->handle, &callbacks);
+    for (int i=0; i<CS_MAX_RETRIES; i++) {
+        result = cpg_initialize (&vip->handle, &callbacks);
+        if ((result == CS_OK) || (result != CS_ERR_TRY_AGAIN)) break;
+        switch_yield(10000);
+    }
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                           "Could not initialize Cluster Process Group API"
@@ -244,7 +250,12 @@ void *SWITCH_THREAD_FUNC vip_thread(switch_thread_t *thread, void *obj)
                       "Local node id is %s\n",
                       utils_node_pid_format(vip->node_id));
 
-    result = cpg_join(vip->handle, &vip->config.group_name);
+
+    for (int i=0; i< CS_MAX_RETRIES; i++) {
+        result = cpg_join(vip->handle, &vip->config.group_name);
+        if ((result == CS_OK) || (result != CS_ERR_TRY_AGAIN)) break;
+        switch_yield(10000);
+    }
     if (result != CS_OK) {
         switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
                           "Could not join process group, error %d\n", result);
