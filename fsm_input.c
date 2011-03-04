@@ -25,6 +25,7 @@
 #include "fsm_input.h"
 
 #include "fsm.h"
+#include "cpg_utils.h"
 
 switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
 {
@@ -37,7 +38,8 @@ switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
     vip->node_list = node_remove(vip->node_list, nodeid);
 
     switch_log_printf(SWITCH_CHANNEL_LOG,
-                      SWITCH_LOG_NOTICE, "nodeid = %u\n",nodeid);
+                      SWITCH_LOG_NOTICE, "nodeid = %s\n",
+                      utils_node_pid_format(nodeid));
 
     if (vip->rollback_node_id == nodeid) {
         vip->rollback_node_id = 0;

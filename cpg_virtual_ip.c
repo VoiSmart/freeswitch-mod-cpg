@@ -321,29 +321,25 @@ static void DeliverCallback (
             if (vip->node_id != nodeid) {
                 char *sql = NULL;
                 char *profile_name = NULL;
+                switch_bool_t found = SWITCH_FALSE;
 
                 profile_name = (char *)msg + sizeof(header_t);
                 sql = (char *)msg + sizeof(header_t) + MAX_SOFIA_NAME;
 
                 for (int i=0; i<MAX_SOFIA_PROFILES; i++) {
                     if (!strcmp(vip->config.profiles[i].name, profile_name)) {
+                        found = SWITCH_TRUE;
 
                         utils_send_track_event(sql,
                                                vip->config.profiles[i].name);
 
-                        switch_log_printf(SWITCH_CHANNEL_LOG,
-                                          SWITCH_LOG_DEBUG,
-                                          "received sql from other node\n");
-                        goto end;
+                       break;
                     }
                 }
-                switch_log_printf(SWITCH_CHANNEL_LOG,
-                                  SWITCH_LOG_ERROR,
-                                  "invalid profile index!\n");
-
-            } else {
-                switch_log_printf(SWITCH_CHANNEL_LOG,
-                                  SWITCH_LOG_DEBUG,"discarded my sql\n");
+                if (!found) {
+                    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR,
+                                      "invalid profile index!\n");
+                }
             }
             break;
         case NODE_STATE:
@@ -358,11 +354,10 @@ static void DeliverCallback (
             switch_log_printf(SWITCH_CHANNEL_LOG,
                               SWITCH_LOG_ERROR,"Bad header\n");
     }
-end:
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
-                      "DeliverCallback: message (len=%lu)from %s\n",
-                      (unsigned long int) msg_len,
-                      utils_node_pid_format(nodeid));
+    //switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG,
+    //                  "DeliverCallback: message (len=%lu)from %s\n",
+    //                  (unsigned long int) msg_len,
+    //                 utils_node_pid_format(nodeid));
 }
 
 static void ConfchgCallback (

@@ -344,9 +344,9 @@ void utils_send_track_event(char *sql, char *profile_name)
         switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "profile_name", profile_name);
         switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "sql",sql);
         switch_event_fire(&event);
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "recovery sent\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "recovery message sent to sofia\n");
     } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "recovery not sent\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "recovery message not sent to sofia\n");
     }
 
 }
@@ -359,9 +359,9 @@ void utils_send_request_all(char *profile_name)
         switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "profile_name", profile_name);
         switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "request_all","true");
         switch_event_fire(&event);
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "request_all sent\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "request_all sent to sofia\n");
     } else {
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "request_all not sent\n");
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "request_all not sent to sofia\n");
     }
 
 }
