@@ -331,11 +331,16 @@ switch_status_t utils_recover(char *profile_name)
 
 switch_status_t utils_profile_control(char *profile_name)
 {
+    /*TODO trovare un altro modo per controllare che il profilo sofia sia definito. Probabilmente il controllo sul file è una idiozia.*/
     char pathname[128];
     switch_snprintf(pathname,sizeof(pathname),"%s/sip_profiles/%s.xml",SWITCH_GLOBAL_dirs.conf_dir,profile_name);
     return switch_file_exists(pathname,globals.pool);
 }
 
+/* 
+ * invio a sofia(vedere patch in freeswitch) le query che mi arrivano dagli altri nodi. Mando il profile name perchè
+ * serve a sofia per capire in che profilo eseguire la query SQL
+ */
 void utils_send_track_event(char *sql, char *profile_name)
 {
     switch_event_t *event = NULL;
@@ -351,6 +356,11 @@ void utils_send_track_event(char *sql, char *profile_name)
 
 }
 
+
+/*
+ * chiedo alla patch tutte le chiamate. Probabilmente ritorna una una insert con tutte le chiamate da inserire.
+ * usata all'avvio di un nuovo nodo che deve ricostrurie lo stato delle chiamate in corso alla sua accensione.
+ */
 void utils_send_request_all(char *profile_name)
 {
     switch_event_t *event = NULL;
@@ -366,6 +376,9 @@ void utils_send_request_all(char *profile_name)
 
 }
 
+/*
+ * callback che conta i risultati di una query sql.
+ */
 static int show_callback(void *pArg, int argc, char **argv, char **columnNames)
 {
     int *count;
@@ -388,7 +401,7 @@ int utils_count_profile_channels(char *profile_name)
     if (switch_core_db_handle(&db) != SWITCH_STATUS_SUCCESS) {
         return -1;
     }
-
+    /*non mi ricordo per quale motivo non usai una count(*)*/
     sql = switch_mprintf("select * from channels where hostname='%s' AND (name LIKE 'sofia/%s/%')", hostname, profile_name);
 
     if (!sql)

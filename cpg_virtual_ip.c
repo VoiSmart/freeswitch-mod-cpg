@@ -360,6 +360,10 @@ static void DeliverCallback (
     //                 utils_node_pid_format(nodeid));
 }
 
+
+/*
+ * callback per corosync, vine chiamata ad ogni cambio configurazione del cluster
+ */
 static void ConfchgCallback (
     cpg_handle_t handle,
     const struct cpg_name *groupName,

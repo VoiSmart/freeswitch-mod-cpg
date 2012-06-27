@@ -44,12 +44,37 @@ switch_status_t noop(virtual_ip_t *vip);
 switch_status_t error(virtual_ip_t *vip);
 switch_status_t dup_warn(virtual_ip_t * vip);
 
+/*
+ * Appena parto sono IDLE e accetto solo un evento di START con il quale faccio partire il thread
+ * che gestisce il singolo virtual_ip.
+ * Se sono in START:
+ * - divento BACKUP solo quando tutti gli altri mi hanno dato le loro info di stato.
+ * - se trovo un altro nodo con il mio profilo e la mia stessa priorità mi spengo.
+ * - se sono solo divento direttamente MASTER
+ * - se un altro si accendo mi pubblicizzo
+ * - se ricevo una richiesta di rollback c'è un errore(non ho ancora le chiamate)
+ * - se ricevo STOP mi fermo
+ * 
+ * Se sono MASTER:
+ * - se ho un nuovo backup che si alza, allora gli mando il mio stato
+ * - se ricevo una richiesta di rollback mi preparo a mollare le chiamate in corso e l'ip virtuale
+ * 
+ * Se sono BACKUP:
+ * - se il master va giù guardo se tocca a me reagire e, nel caso reagisco prendendomi ip e chiamate
+ * - EVT_MASTER_UP forse non è un nome corretto ma di sicuro non mi può arrivare
+ * - Se ricevo uno stato di un nodo mi pubblicizzo anche io
+ * 
+ * Se sono ROLLBACK:
+ * - e cade un nodo BACKUP allora rimango master
+ * - se ricevo una nuova richiesta di rollback blocco il rollback che sta avvenendo
+ *
+ */
 
 /*actions lookup table*/
 action_t table[MAX_EVENTS][MAX_STATES] = {
 /*ST_IDLE    , ST_START   , ST_BACKUP  , ST_MASTER  , ST_RBACK  */
 { go_up      , error      , error      , error      , error      },/*EVT_START*/
-{ error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DULICATE*/
+{ error      , go_down    , dup_warn   , dup_warn   , dup_warn   },/*EVT_DUPLICATE*/
 { error      , act        , react      , error      , error      },/*EVT_MASTER_DOWN*/
 { error      , observe    , error      , error      , error      },/*EVT_MASTER_UP*/
 { error      , noop       , noop       , noop       , rback_stop },/*EVT_BACKUP_DOWN*/
@@ -99,11 +124,18 @@ switch_status_t dup_warn(virtual_ip_t * vip){
     return SWITCH_STATUS_SUCCESS;
 }
 
+
+/*
+ * pubblico il mio stato e quindi segnalo la mia presenza
+ */
 switch_status_t nodeup(virtual_ip_t * vip)
 {
     return virtual_ip_send_state(vip);
 }
-
+/*
+ * pubblico il mio stato e invio l'elenco delle chiamate presenti nel cluster
+ * nel mio profilo
+ */
 switch_status_t backupup(virtual_ip_t * vip)
 {
     switch_status_t status = SWITCH_STATUS_SUCCESS;

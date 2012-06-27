@@ -32,6 +32,7 @@ switch_status_t fsm_input_node_down(virtual_ip_t *vip, uint32_t nodeid)
     switch_status_t status = SWITCH_STATUS_FALSE;
     event_t new_event = EVT_BACKUP_DOWN;
 
+    // se il nodo che è caduto è il master allora MASTER_DOWN
     if (vip->master_id == nodeid) {
         new_event = EVT_MASTER_DOWN;
     }
@@ -83,11 +84,13 @@ switch_status_t
     }
     switch(fsm_get_state(vip)) {
         case ST_START:
-            // se sono solo il master è sicuramente giù
+            // se sono solo, il master è sicuramente giù
             if (vip->member_list_entries == 1) {
                 new_event = EVT_MASTER_DOWN;
             }
             // if the priority list is complete becomes BACKUP
+            // se la lunghezza della lista che mantengo è uguale alla lunghezza della lista
+            // della configurazione che mi manda corosync
             else if (list_entries(vip->node_list)
                     == vip->member_list_entries) {
                 new_event = EVT_MASTER_UP;
