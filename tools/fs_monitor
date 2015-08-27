@@ -1,0 +1,97 @@
+#!/bin/bash
+FSPATH="/opt/freeswitch"
+CONF="$FSPATH/conf/autoload_configs/cpg.conf.xml"
+ARGS="$@"
+
+function log {
+    echo "$@"
+    /usr/bin/logger -t fs_monitor "$@"
+}
+
+log "Starting freeswitch with virtual IP monitoring"
+# try to remove virtual IPs
+function removeIPs {
+    if [ -z "$1" ]; then
+            log 'No IP to remove'
+            return;
+    fi
+    for I in $1;
+        do
+            local DEV=$(/sbin/ip addr | grep $I | awk -F " " '{print $NF}')
+            if [ -z "$DEV" ]; then
+                log "$I is not present $DEV"
+                continue
+            fi
+            RET=$(/sbin/ip addr del $I/32 dev $DEV)
+            log $RET
+            if [ $? -eq 0 ]; then
+                log "IP $I removed"
+            else
+                log "Cannot remove IP $I"
+            fi
+        done
+}
+
+function getIPs {
+    cat $1  | grep address |
+                         awk -F"address=" '{ print $2 }' |
+                         awk -F"\"" '{ print $2 }'
+}
+
+# set capabilities
+CAP="cap_net_admin,cap_net_raw=eip"
+RET=$(/usr/sbin/setcap $CAP $FSPATH/bin/freeswitch)
+if [ $? -eq 0 ]; then
+    log 'capabilities are set'
+else
+    log "$RET, capabilities are wrong"
+    exit 127
+fi
+
+RET=$(echo 1 >/proc/sys/net/ipv4/ip_nonlocal_bind)
+if [ $? -eq 0 ]; then
+    log 'non local bind enabled'
+else
+    log "cannot enable non local bind"
+    exit 127
+fi
+
+
+## check capabilities
+#CAP="cap_net_admin,cap_net_raw+eip"
+#RET=$(/usr/sbin/getcap $FSPATH/bin/freeswitch | awk -F " = " '{ print $NF}')
+#if [ $RET = $CAP ]; then
+#    log 'capabilities are ok'
+#else
+#    log '$RET capabilities are wrong'
+#    exit 127
+#fi
+
+# get IP list
+IPS=$(getIPs $CONF)
+
+# remove virtual IPs
+removeIPs $IPS
+
+# start fs
+log "starting freeswitch: '$ARGS'"
+runuser -s /bin/bash $ARGS
+log "Freeswitch launched ($?)"
+sleep 1s
+
+# check FS
+ps ax | grep "freeswitch " | grep -v grep | grep -v monitor > /dev/null 2>&1
+retval=$?
+while [ $retval -eq 0 ]
+    do
+        ps ax | grep "freeswitch " |
+                grep -v grep | grep -v monitor > /dev/null 2>&1
+        retval=$?
+        sleep 0.5s
+    done
+
+# remove virtual IPs when fs crashes
+IPS=$(getIPs $CONF)
+
+# remove virtual IPs
+removeIPs $IPS

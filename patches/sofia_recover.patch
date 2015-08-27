@@ -1,0 +1,127 @@
+diff -ur freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/mod_sofia.c freeswitch-1.0.7/src/mod/endpoints/mod_sofia/mod_sofia.c
+--- freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/mod_sofia.c	2010-10-15 12:39:02.000000000 +0200
++++ freeswitch-1.0.7/src/mod/endpoints/mod_sofia/mod_sofia.c	2010-10-18 11:42:48.000000000 +0200
+@@ -3159,6 +3159,22 @@
+ 		}
+ 		goto done;
+ 	}
++	
++	if (!strcasecmp(argv[1], "recover")) {
++		if (argv[2] && !strcasecmp(argv[2], "flush")) {
++			sofia_glue_profile_recover(profile, SWITCH_TRUE);
++			stream->write_function(stream, "Flushing recovery database.\n");
++		} else {
++			int x = sofia_glue_profile_recover(profile, SWITCH_FALSE);
++			if (x) {
++				stream->write_function(stream, "Recovered %d call(s)\n", x);
++			} else {
++				stream->write_function(stream, "No calls to recover.\n");
++			}
++		}
++
++		goto done;
++	}
+ 
+ 	if (!strcasecmp(argv[1], "siptrace")) {
+ 		if (argc > 2) {
+Only in freeswitch-1.0.7/src/mod/endpoints/mod_sofia: mod_sofia.c.orig
+diff -ur freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/mod_sofia.h freeswitch-1.0.7/src/mod/endpoints/mod_sofia/mod_sofia.h
+--- freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/mod_sofia.h	2010-10-15 12:39:02.000000000 +0200
++++ freeswitch-1.0.7/src/mod/endpoints/mod_sofia/mod_sofia.h	2010-10-18 11:42:48.000000000 +0200
+@@ -1012,6 +1012,7 @@
+ void sofia_glue_tech_untrack(sofia_profile_t *profile, switch_core_session_t *session, switch_bool_t force);
+ void sofia_glue_tech_track(sofia_profile_t *profile, switch_core_session_t *session);
+ int sofia_glue_recover(switch_bool_t flush);
++int sofia_glue_profile_recover(sofia_profile_t *profile, switch_bool_t flush);
+ void sofia_profile_destroy(sofia_profile_t *profile);
+ switch_status_t sip_dig_function(_In_opt_z_ const char *cmd, _In_opt_ switch_core_session_t *session, _In_ switch_stream_handle_t *stream);
+ const char *sofia_gateway_status_name(sofia_gateway_status_t status);
+Only in freeswitch-1.0.7/src/mod/endpoints/mod_sofia: mod_sofia.h.orig
+diff -ur freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/sofia_glue.c freeswitch-1.0.7/src/mod/endpoints/mod_sofia/sofia_glue.c
+--- freeswitch-1.0.7.orig/src/mod/endpoints/mod_sofia/sofia_glue.c	2010-10-15 12:39:02.000000000 +0200
++++ freeswitch-1.0.7/src/mod/endpoints/mod_sofia/sofia_glue.c	2010-10-18 11:42:48.000000000 +0200
+@@ -5128,7 +5128,6 @@
+ 	const void *var;
+ 	void *val;
+ 	sofia_profile_t *profile;
+-	char *sql;
+ 	int r = 0;
+ 
+ 	switch_mutex_lock(mod_sofia_globals.hash_mutex);
+@@ -5137,32 +5136,11 @@
+ 			switch_hash_this(hi, &var, NULL, &val);
+ 
+ 			if ((profile = (sofia_profile_t *) val)) {
+-				struct recover_helper h = { 0 };
+-				h.profile = profile;
+-				h.total = 0;
+-
++				
+ 				if (strcmp((char *) var, profile->name)) {
+-					continue;
+-				}
+-
+-				if (flush) {
+-					sql = switch_mprintf("delete from sip_recovery where profile_name='%q'", profile->name);
+-					sofia_glue_execute_sql_now(profile, &sql, SWITCH_TRUE);
+-				} else {
+-
+-					sql = switch_mprintf("select profile_name, hostname, uuid, metadata "
+-										 "from sip_recovery where runtime_uuid!='%q' and profile_name='%q'", switch_core_get_uuid(), profile->name);
+-
+-					sofia_glue_execute_sql_callback(profile, profile->ireg_mutex, sql, recover_callback, &h);
+-					r += h.total;
+-					free(sql);
+-					sql = NULL;
+-
+-					sql = switch_mprintf("delete "
+-										 "from sip_recovery where runtime_uuid!='%q' and profile_name='%q'", switch_core_get_uuid(), profile->name);
+-
+-					sofia_glue_execute_sql_now(profile, &sql, SWITCH_TRUE);
+-				}
++		            continue;
++	            }
++				r += sofia_glue_profile_recover(profile,flush);
+ 			}
+ 		}
+ 	}
+@@ -5171,6 +5149,38 @@
+ 	return r;
+ }
+ 
++int sofia_glue_profile_recover(sofia_profile_t *profile, switch_bool_t flush)
++{
++    char *sql;
++	int r = 0;
++	
++    if (profile) {
++	    struct recover_helper h = { 0 };
++	    h.profile = profile;
++	    h.total = 0;
++
++	    if (flush) {
++		    sql = switch_mprintf("delete from sip_recovery where profile_name='%q'", profile->name);
++		    sofia_glue_execute_sql_now(profile, &sql, SWITCH_TRUE);
++	    } else {
++
++		    sql = switch_mprintf("select profile_name, hostname, uuid, metadata "
++							     "from sip_recovery where runtime_uuid!='%q' and profile_name='%q'", switch_core_get_uuid(), profile->name);
++
++		    sofia_glue_execute_sql_callback(profile, profile->ireg_mutex, sql, recover_callback, &h);
++		    r += h.total;
++		    free(sql);
++		    sql = NULL;
++
++		    sql = switch_mprintf("delete "
++							     "from sip_recovery where runtime_uuid!='%q' and profile_name='%q'", switch_core_get_uuid(), profile->name);
++
++		    sofia_glue_execute_sql_now(profile, &sql, SWITCH_TRUE);
++	    }
++    }
++    return r;
++}
++
+ void sofia_glue_track_event_handler(switch_event_t *event)
+ {
+ 	char *sql, *buf = NULL;
+Only in freeswitch-1.0.7/src/mod/endpoints/mod_sofia: sofia_glue.c.orig
